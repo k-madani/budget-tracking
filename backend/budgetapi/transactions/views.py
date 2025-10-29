@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
+from django.db.models import Sum, Avg
 
 from .models import Transaction
 from .serializers import TransactionWriteSerializer, TransactionReadSerializer
@@ -62,3 +63,24 @@ def transaction_detail(request, pk):
 
     tx.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def transactions_summary(request):
+    qs = _filter_queryset_for_user(request)
+
+    agg = qs.aggregate(
+        total=Sum("amount"),
+        avg=Avg("amount"),
+    )
+    count = qs.count()
+
+    # Coalesce None → 0 for empty ranges
+    total = float(agg["total"] or 0)
+    avg = float(agg["avg"] or 0)
+
+    return Response({
+        "count": count,
+        "total": total,
+        "avg": avg
+    })
