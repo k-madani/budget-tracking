@@ -17,7 +17,9 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from accounts.views import register_view, login_view
-from transactions.views import transaction_detail, transactions, transactions_summary
+from transactions.views import (
+    transaction_detail, transactions, transactions_summary,
+    categories, category_detail)
 
 
 urlpatterns = [
@@ -31,4 +33,8 @@ urlpatterns = [
     path("api/transactions", transactions, name="transactions"),
     path("api/transactions/<uuid:pk>", transaction_detail, name="transaction-detail"),
     path("api/transactions/summary", transactions_summary, name="transactions-summary"),
+
+    # Categories
+    path("api/categories", categories, name="categories"),
+    path("api/categories/<uuid:pk>", category_detail, name="category-detail"),
 ]

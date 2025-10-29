@@ -2,9 +2,27 @@ import uuid
 from django.conf import settings
 from django.db import models
 
+class Category(models.Model):
+    INCOME = "INCOME"
+    EXPENSE = "EXPENSE"
+    TYPE_CHOICES = [(INCOME, "Income"), (EXPENSE, "Expense")]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="categories")
+    name = models.CharField(max_length=64)
+    type = models.CharField(max_length=7, choices=TYPE_CHOICES, default=EXPENSE)
+
+    class Meta:
+        unique_together = ("owner", "name")   # each user can't duplicate names
+        ordering = ("name",)
+
+    def __str__(self):
+        return f"{self.name} ({self.type})"
+
 class Transaction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="transactions")
+    category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="transactions", null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=3, default="USD")
     note = models.CharField(max_length=255, blank=True, null=True)
