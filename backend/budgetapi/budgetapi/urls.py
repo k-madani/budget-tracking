@@ -16,12 +16,18 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from accounts.views import RegisterView, LoginView
+from accounts.views import register_view, login_view
+from transactions.views import transaction_detail, transactions
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    
     # Auth endpoints
-    path("api/auth/register", RegisterView.as_view(), name="register"),
-    path("api/auth/login", LoginView.as_view(), name="login"),
+    path("api/auth/register", register_view, name="register"),
+    path("api/auth/login", login_view, name="login"),
+
+    # Transactions
+    path("api/transactions", transactions, name="transactions"),
+    path("api/transactions/<uuid:pk>", transaction_detail, name="transaction-detail"),
 ]
