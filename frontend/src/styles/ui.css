@@ -1,0 +1,233 @@
+/* ===========================
+   RESET & BASE
+   =========================== */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+a { color: inherit; text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font: inherit; cursor: pointer; }
+
+/* ===========================
+   THEME TOKENS & TYPE SCALE
+   =========================== */
+:root{
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e5e7eb;
+  --ring: #94a3b8;
+  --primary: #10b981;
+  --primary-ink: #064e3b;
+  --shadow: 0 8px 24px rgba(2, 6, 23, .06);
+
+  /* Responsive typography */
+  --h1: clamp(24px, 4.2vw, 40px);
+  --h2: clamp(18px, 2.6vw, 22px);
+  --body: clamp(14px, 1.6vw, 16px);
+}
+body{ font-size: var(--body); }
+h1{ font-size: var(--h1); margin: 0; }
+h2{ font-size: var(--h2); margin: 0 0 10px; }
+
+/* ===========================
+   PAGE FRAME & LAYOUT
+   =========================== */
+.page{
+  min-height: 100dvh;           /* mobile-safe viewport height */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Fluid container with responsive gutters */
+.container{
+  width: 100%;
+  max-width: none;
+  padding-inline: clamp(12px, 2vw, 40px);
+}
+
+/* Section spacing scales with screen */
+.section { margin-top: clamp(16px, 2.5vw, 36px); }
+
+/* Full-bleed helper for edge-to-edge sections (e.g., carousel) */
+.fullbleed{
+  margin-inline: calc(50% - 50vw);
+  padding-inline: 0;
+}
+
+/* ===========================
+   HEADER / NAV (CLEAN LINKS)
+   =========================== */
+.navbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 50;
+}
+/* Translucent background overlaying hero */
+.header-bg{
+  background: rgba(17, 24, 39, .28);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.navbar-inner{
+  display:flex; align-items:center; justify-content:space-between;
+  height: 64px;
+  padding-inline: clamp(12px, 2vw, 40px);
+}
+.brand{
+  display:flex; align-items:center; gap:10px; font-weight:700;
+}
+.brand-mark{
+  display:grid; place-items:center;
+  width:28px; height:28px; border-radius:8px;
+  background: var(--primary); color: var(--primary-ink);
+}
+.nav{
+  display:flex; gap:24px; align-items:center;
+}
+.nav a{
+  font-weight:500; color:#fff;
+  text-decoration:none; position:relative; padding:4px 0;
+}
+.nav a::after{
+  content:""; position:absolute; left:0; bottom:-2px; height:2px; width:0%;
+  background-color: var(--primary); transition: width .25s ease-in-out;
+}
+.nav a:hover::after{ width:100%; }
+/* Optional: mark active link by adding class="active" in markup */
+.nav a.active::after{ width:100%; }
+
+/* ===========================
+   GRID UTILITIES
+   =========================== */
+.grid{ display:grid; gap: clamp(8px, 1.5vw, 16px); }
+.grid-3 { grid-template-columns: 1fr; }
+.grid-4 { grid-template-columns: 1fr; }
+
+@media (min-width: 600px){
+  .grid-3 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .grid-4 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (min-width: 900px){
+  .grid-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .grid-4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+}
+
+/* ===========================
+   BUTTONS
+   =========================== */
+.btn{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 14px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.92);
+  color: var(--text);
+}
+.btn:focus{ outline: 2px solid var(--ring); outline-offset: 2px; }
+.btn-primary{
+  background: var(--primary);
+  color:#fff;
+  border-color: transparent;
+}
+.btn-primary:hover{ filter: brightness(.95); }
+
+/* ===========================
+   CARDS / STATS
+   =========================== */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  box-shadow:var(--shadow);
+}
+.card-pad{ padding:16px; }
+
+.stat{ display:grid; gap:6px; }
+.stat .label{ color:var(--muted); font-size:14px; }
+.stat .value{ font-size: clamp(20px, 3.2vw, 28px); font-weight: 700; }
+
+/* ===========================
+   HERO CAROUSEL (FULL PAGE)
+   =========================== */
+.carousel{
+  position: relative;
+  height: 100dvh;               /* full viewport height */
+  width: 100%;
+  overflow: hidden;
+  background:#000;
+}
+.slide{
+  position:absolute; inset:0;
+  background:#222 center / cover no-repeat;
+  opacity:0;
+  transition: opacity .6s ease;
+}
+.slide.visible{ opacity:1; }
+.slide.alt-1{ background-image: url('/slide-1.jpg'); }
+.slide.alt-2{ background-image: url('/slide-2.jpg'); }
+.slide.alt-3{ background-image: url('/slide-3.jpg'); }
+
+/* Dark gradient for legible text over any image */
+.carousel-overlay{
+  position:absolute; inset:0;
+  background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.55));
+  display:flex; flex-direction:column; justify-content:center;
+}
+
+/* Centered hero copy */
+.hero-copy{
+  color:#fff;
+  padding-inline: clamp(16px, 4vw, 56px);
+  max-width: 1100px;
+  margin-inline: auto;
+}
+.hero-sub{
+  color: rgba(255,255,255,.85);
+  max-width: 720px;
+  margin-top: 10px;
+}
+
+/* Carousel controls */
+.carousel-controls{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:space-between;
+  padding-inline: clamp(10px, 2vw, 18px);
+}
+.ctrl{
+  width: clamp(36px, 5vw, 48px);
+  height: clamp(36px, 5vw, 48px);
+  display:grid; place-items:center;
+  background: rgba(255,255,255,.9);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+}
+.ctrl:hover{ background:#fff; }
+
+/* ===========================
+   FEATURE TILES
+   =========================== */
+.feature{ display: grid; gap: 6px; }
+.feature .icon{ font-size: 22px; }
+.feature .title{ font-weight: 600; }
+.feature .desc{ color: var(--muted); font-size: 14px; }
+
+/* ===========================
+   FOOTER
+   =========================== */
+.footer{
+  color:var(--muted);
+  font-size:12px;
+  text-align:center;
+  margin: clamp(20px, 3vw, 28px) 0;
+}
