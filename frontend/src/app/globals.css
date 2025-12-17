@@ -1,26 +1,105 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Light Theme */
+  --background: 0 0% 100%;
+  --foreground: 220 13% 13%;
+  
+  --primary: 158 64% 52%;
+  --primary-foreground: 0 0% 100%;
+  
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 0 0% 100%;
+  
+  --accent: 174 62% 47%;
+  --accent-foreground: 0 0% 100%;
+  
+  --success: 142 76% 36%;
+  --success-light: 142 76% 96%;
+  
+  --warning: 38 92% 50%;
+  --warning-light: 38 92% 95%;
+  
+  --danger: 0 72% 51%;
+  --danger-light: 0 72% 97%;
+  
+  --muted: 220 13% 95%;
+  --muted-foreground: 220 9% 46%;
+  
+  --card: 0 0% 100%;
+  --card-foreground: 220 13% 13%;
+  
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 158 64% 52%;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+.dark {
+  /* Dark Theme */
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+  
+  --primary: 158 64% 58%;
+  --primary-foreground: 222 47% 11%;
+  
+  --secondary: 217 33% 25%;
+  --secondary-foreground: 210 40% 98%;
+  
+  --accent: 174 62% 55%;
+  --accent-foreground: 222 47% 11%;
+  
+  --success: 142 76% 42%;
+  --success-light: 142 76% 15%;
+  
+  --warning: 38 92% 58%;
+  --warning-light: 38 92% 15%;
+  
+  --danger: 0 72% 58%;
+  --danger-light: 0 72% 15%;
+  
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  
+  --card: 222 47% 14%;
+  --card-foreground: 210 40% 98%;
+  
+  --border: 217 33% 20%;
+  --input: 217 33% 20%;
+  --ring: 158 64% 58%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: hsl(var(--border));
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Utility Classes */
+.gradient-primary {
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
+}
+
+.gradient-success {
+  background: linear-gradient(135deg, hsl(var(--success)) 0%, hsl(var(--primary)) 100%);
+}
+
+.gradient-card {
+  background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--muted)) 100%);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
