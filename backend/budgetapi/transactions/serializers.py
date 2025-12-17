@@ -2,9 +2,11 @@ from rest_framework import serializers
 from .models import Transaction, Category
 
 class TransactionWriteSerializer(serializers.ModelSerializer):
-    # accepts category UUID; optional for now
+    # Make category optional
     category = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(), required=False, allow_null=True
+        queryset=Category.objects.all(), 
+        required=False,  # ← Changed to optional
+        allow_null=True
     )
 
     class Meta:
@@ -23,7 +25,7 @@ class TransactionWriteSerializer(serializers.ModelSerializer):
         return v
 
     def validate_category(self, value):
-        # ensure category belongs to the requester
+        # ensure category belongs to the requester (if provided)
         request = self.context.get("request")
         if value is not None and value.owner_id != request.user.id:
             raise serializers.ValidationError("Invalid category.")

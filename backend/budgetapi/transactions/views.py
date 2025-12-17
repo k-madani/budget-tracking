@@ -12,6 +12,7 @@ from .serializers import (
     TransactionWriteSerializer, TransactionReadSerializer,
     CategorySerializer
 )
+from .utils import auto_categorize_transaction, get_default_category
 
 # ---------- helpers ----------
 def _filter_queryset_for_user(request):
@@ -37,15 +38,37 @@ def transactions(request):
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(qs, request)
         data = TransactionReadSerializer(page, many=True).data
-        # your simplified response (no next/previous)
         return Response({"count": paginator.page.paginator.count, "results": data})
 
-    # POST
+    # POST - Create transaction with auto-categorization
+    note = request.data.get("note", "")
+    category_id = request.data.get("category")
+    
+    # If no category provided, try auto-categorization
+    if not category_id and note:
+        suggested_category = auto_categorize_transaction(note, request.user)
+        if suggested_category:
+            request.data['category'] = str(suggested_category.id)
+    
+    # If still no category, detect if income or expense and use appropriate default
+    if not request.data.get('category'):
+        # Check if note contains income keywords
+        note_lower = note.lower()
+        income_keywords = ["salary", "income", "paycheck", "wages", "freelance", "bonus", "payment received"]
+        
+        is_income = any(keyword in note_lower for keyword in income_keywords)
+        transaction_type = "INCOME" if is_income else "EXPENSE"
+        
+        default_category = get_default_category(request.user, transaction_type)
+        request.data['category'] = str(default_category.id)
+    
     ser = TransactionWriteSerializer(data=request.data, context={"request": request})
     if ser.is_valid():
         obj = ser.save(owner=request.user)
         return Response(TransactionReadSerializer(obj).data, status=status.HTTP_201_CREATED)
+    
     return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(["GET", "PUT", "DELETE"])
 @permission_classes([IsAuthenticated])
@@ -71,11 +94,10 @@ def transaction_detail(request, pk):
 def transactions_summary(request):
     qs = _filter_queryset_for_user(request)
 
-    # sum amounts by category type; uncategorized are treated as EXPENSE by default (you can change)
     income = qs.filter(category__type=Category.INCOME).aggregate(s=Sum("amount"))["s"] or 0
     expense = qs.filter(category__type=Category.EXPENSE).aggregate(s=Sum("amount"))["s"] or 0
 
-    # (optional) include uncategorized as expense:
+    # Include uncategorized as expense
     uncategorized = qs.filter(category__isnull=True).aggregate(s=Sum("amount"))["s"] or 0
     expense = (expense or 0) + (uncategorized or 0)
 
@@ -99,7 +121,7 @@ def categories(request):
     ser = CategorySerializer(data=request.data)
     if ser.is_valid():
         ser.save(owner=request.user)
-        return Response(ser.data, status=status.HTTP_201_CREATED)
+        return Response(ser.data, status=status.HTTP_200_OK)
     return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(["PUT", "DELETE", "GET"])
