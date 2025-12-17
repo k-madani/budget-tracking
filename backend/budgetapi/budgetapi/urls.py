@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from accounts.views import register_view, login_view
+from accounts.views import register_view, login_view, reset_password_view
 from transactions.views import (
     transaction_detail, transactions, transactions_summary,
     categories, category_detail)
@@ -28,6 +28,7 @@ urlpatterns = [
     # Auth endpoints
     path("api/auth/register", register_view, name="register"),
     path("api/auth/login", login_view, name="login"),
+    path("api/auth/reset-password", reset_password_view, name="reset-password"),
 
     # Transactions
     path("api/transactions", transactions, name="transactions"),

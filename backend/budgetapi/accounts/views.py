@@ -71,3 +71,25 @@ def login_view(request):
         {"refresh": str(refresh), "access": str(refresh.access_token)},
         status=status.HTTP_200_OK
     )
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def reset_password_view(request):
+    email = request.data.get("email")
+    new_password = request.data.get("new_password")
+
+    if not email:
+        return Response({"detail": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not new_password:
+        return Response({"detail": "New password is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(email__iexact=email)
+    except User.DoesNotExist:
+        return Response({"detail": "User with this email does not exist"}, status=status.HTTP_404_NOT_FOUND)
+
+    # Update password
+    user.set_password(new_password)
+    user.save()
+
+    return Response({"message": "Password reset successfully"}, status=status.HTTP_200_OK)
