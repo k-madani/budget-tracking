@@ -7,14 +7,41 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import RegisterSerializer
+from transactions.models import Category
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_view(request):
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
-        return Response({"message": "User registered successfully"}, status=status.HTTP_201_CREATED)
+        user = serializer.save()
+        
+        # Create starter categories
+        starter_categories = [
+            # Expense categories
+            {"name": "Food & Dining", "type": "EXPENSE"},
+            {"name": "Groceries", "type": "EXPENSE"},
+            {"name": "Transportation", "type": "EXPENSE"},
+            {"name": "Shopping", "type": "EXPENSE"},
+            {"name": "Entertainment", "type": "EXPENSE"},
+            {"name": "Bills & Utilities", "type": "EXPENSE"},
+            {"name": "Healthcare", "type": "EXPENSE"},
+            {"name": "Other Expenses", "type": "EXPENSE"},
+            
+            # Income categories
+            {"name": "Salary", "type": "INCOME"},
+            {"name": "Freelance", "type": "INCOME"},
+            {"name": "Other Income", "type": "INCOME"},
+        ]
+        
+        for cat_data in starter_categories:
+            Category.objects.create(owner=user, **cat_data)
+        
+        return Response({
+            "message": "User registered successfully",
+            "categories_created": len(starter_categories)
+        }, status=status.HTTP_200_OK)
+    
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
