@@ -48,8 +48,6 @@ export default function TransactionsPage() {
 
   // Modal state
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -57,6 +55,7 @@ export default function TransactionsPage() {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [spentAt, setSpentAt] = useState(new Date().toISOString().split('T')[0]);
+  const [spentAtTime, setSpentAtTime] = useState('12:00');
   const [currency, setCurrency] = useState('USD');
   const [selectedCategory, setSelectedCategory] = useState('');
 
@@ -67,6 +66,7 @@ export default function TransactionsPage() {
       return;
     }
 
+    // Load theme
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     const initialTheme = savedTheme || systemTheme;
@@ -77,6 +77,7 @@ export default function TransactionsPage() {
     fetchData();
   }, [router]);
 
+  // Fetch data when date filters change
   useEffect(() => {
     if (!loading) {
       fetchData();
@@ -94,6 +95,7 @@ export default function TransactionsPage() {
     try {
       setLoading(true);
       
+      // Build query params for date filtering
       const params = new URLSearchParams();
       if (dateFrom) params.append('from', dateFrom);
       if (dateTo) params.append('to', dateTo);
@@ -132,6 +134,7 @@ export default function TransactionsPage() {
       return;
     }
 
+    // Validate amount
     const amountNum = parseFloat(amount);
     if (amountNum <= 0) {
       alert('Amount must be greater than 0');
@@ -141,8 +144,8 @@ export default function TransactionsPage() {
     setSubmitting(true);
 
     try {
-      // Set time to noon to avoid timezone issues
-      const spentAtISO = new Date(`${spentAt}T12:00:00`).toISOString();
+      // Combine date and time into ISO format
+      const spentAtISO = new Date(`${spentAt}T${spentAtTime}:00`).toISOString();
       
       const payload: any = {
         amount: amountNum,
@@ -151,6 +154,7 @@ export default function TransactionsPage() {
         spent_at: spentAtISO,
       };
 
+      // Only include category if selected (backend handles auto-categorization)
       if (selectedCategory) {
         payload.category = selectedCategory;
       }
@@ -181,18 +185,11 @@ export default function TransactionsPage() {
     }
   };
 
-  const confirmDelete = (transaction: Transaction) => {
-    setTransactionToDelete(transaction);
-    setShowDeleteModal(true);
-  };
-
-  const handleDelete = async () => {
-    if (!transactionToDelete) return;
+  const handleDelete = async (transactionId: string) => {
+    if (!confirm('Are you sure you want to delete this transaction?')) return;
 
     try {
-      await api.delete(`/transactions/${transactionToDelete.id}`);
-      setShowDeleteModal(false);
-      setTransactionToDelete(null);
+      await api.delete(`/transactions/${transactionId}`);
       fetchData();
     } catch (error) {
       console.error('Failed to delete transaction:', error);
@@ -205,8 +202,10 @@ export default function TransactionsPage() {
     setAmount(transaction.amount);
     setNote(transaction.note || '');
     
+    // Parse spent_at to date and time
     const spentDate = new Date(transaction.spent_at);
     setSpentAt(spentDate.toISOString().split('T')[0]);
+    setSpentAtTime(spentDate.toTimeString().slice(0, 5));
     
     setCurrency(transaction.currency);
     setSelectedCategory(transaction.category || '');
@@ -217,12 +216,14 @@ export default function TransactionsPage() {
     setAmount('');
     setNote('');
     setSpentAt(new Date().toISOString().split('T')[0]);
+    setSpentAtTime('12:00');
     setCurrency('USD');
     setSelectedCategory('');
     setEditingTransaction(null);
     setShowAddModal(false);
   };
 
+  // Filter transactions locally
   const filteredTransactions = transactions.filter(t => {
     const matchesType = filterType === 'all' || t.category_type === filterType;
     const matchesCategory = filterCategory === 'all' || t.category === filterCategory;
@@ -230,6 +231,7 @@ export default function TransactionsPage() {
     return matchesType && matchesCategory && matchesSearch;
   });
 
+  // Calculate totals
   const totalIncome = filteredTransactions
     .filter(t => t.category_type === 'INCOME')
     .reduce((sum, t) => sum + parseFloat(t.amount), 0);
@@ -388,13 +390,7 @@ export default function TransactionsPage() {
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as any)}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 0.75rem center',
-                  backgroundSize: '1.25rem'
-                }}
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">All Types</option>
                 <option value="INCOME">Income</option>
@@ -407,18 +403,12 @@ export default function TransactionsPage() {
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 0.75rem center',
-                  backgroundSize: '1.25rem'
-                }}
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">All Categories</option>
                 {categories.map(cat => (
                   <option key={cat.id} value={cat.id}>
-                    {cat.name}
+                    {cat.name} ({cat.type})
                   </option>
                 ))}
               </select>
@@ -430,7 +420,7 @@ export default function TransactionsPage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
 
@@ -440,7 +430,7 @@ export default function TransactionsPage() {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
 
@@ -451,11 +441,12 @@ export default function TransactionsPage() {
                 placeholder="Search notes..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
 
+          {/* Clear Filters Button */}
           {(dateFrom || dateTo || filterType !== 'all' || filterCategory !== 'all' || searchQuery) && (
             <div className="mt-4">
               <button
@@ -489,7 +480,7 @@ export default function TransactionsPage() {
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Date</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Date & Time</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Type</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Category</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Note</th>
@@ -504,7 +495,10 @@ export default function TransactionsPage() {
                     return (
                       <tr key={transaction.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-6 py-4 text-sm text-foreground">
-                          {spentDate.toLocaleDateString()}
+                          <div>{spentDate.toLocaleDateString()}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {spentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -539,7 +533,7 @@ export default function TransactionsPage() {
                               </svg>
                             </button>
                             <button
-                              onClick={() => confirmDelete(transaction)}
+                              onClick={() => handleDelete(transaction.id)}
                               className="p-2 text-muted-foreground hover:text-red-500 transition-colors"
                               title="Delete"
                             >
@@ -591,7 +585,7 @@ export default function TransactionsPage() {
                   onChange={(e) => setAmount(e.target.value)}
                   required
                   placeholder="0.00"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -604,23 +598,34 @@ export default function TransactionsPage() {
                   onChange={(e) => setCurrency(e.target.value.toUpperCase())}
                   maxLength={3}
                   placeholder="USD"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <p className="text-xs text-muted-foreground mt-1">3-letter currency code (e.g., USD, EUR)</p>
               </div>
 
-              {/* Date Only */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={spentAt}
-                  onChange={(e) => setSpentAt(e.target.value)}
-                  required
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+              {/* Date and Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={spentAt}
+                    onChange={(e) => setSpentAt(e.target.value)}
+                    required
+                    className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Time</label>
+                  <input
+                    type="time"
+                    value={spentAtTime}
+                    onChange={(e) => setSpentAtTime(e.target.value)}
+                    className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
               </div>
 
               {/* Category (Optional) */}
@@ -631,25 +636,19 @@ export default function TransactionsPage() {
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.75rem center',
-                    backgroundSize: '1.25rem'
-                  }}
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="">All Categories (Auto-categorize)</option>
-                  <optgroup label="Income" className="bg-background text-foreground">
+                  <option value="">Auto-categorize</option>
+                  <optgroup label="Income">
                     {categories.filter(c => c.type === 'INCOME').map(category => (
-                      <option key={category.id} value={category.id} className="py-2">
+                      <option key={category.id} value={category.id}>
                         {category.name}
                       </option>
                     ))}
                   </optgroup>
-                  <optgroup label="Expense" className="bg-background text-foreground">
+                  <optgroup label="Expense">
                     {categories.filter(c => c.type === 'EXPENSE').map(category => (
-                      <option key={category.id} value={category.id} className="py-2">
+                      <option key={category.id} value={category.id}>
                         {category.name}
                       </option>
                     ))}
@@ -665,7 +664,7 @@ export default function TransactionsPage() {
                   onChange={(e) => setNote(e.target.value)}
                   maxLength={255}
                   rows={3}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                   placeholder="Add a note about this transaction..."
                 />
                 <p className="text-xs text-muted-foreground mt-1">{note.length}/255 characters</p>
@@ -677,74 +676,19 @@ export default function TransactionsPage() {
                   type="button"
                   onClick={resetForm}
                   disabled={submitting}
-                  className="flex-1 py-2.5 px-4 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+                  className="flex-1 py-2 px-4 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 py-2.5 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity font-semibold disabled:opacity-50"
+                  className="flex-1 py-2 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity font-semibold disabled:opacity-50"
                 >
                   {submitting ? 'Saving...' : editingTransaction ? 'Update' : 'Add'} Transaction
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && transactionToDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-foreground">Delete Transaction</h3>
-                <p className="text-sm text-muted-foreground">This action cannot be undone</p>
-              </div>
-            </div>
-
-            <div className="bg-muted/30 rounded-lg p-4 mb-6">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-sm font-medium text-foreground">
-                  {transactionToDelete.note || transactionToDelete.category_name || 'Transaction'}
-                </span>
-                <span className={`text-sm font-bold ${
-                  transactionToDelete.category_type === 'INCOME' ? 'text-green-500' : 'text-red-500'
-                }`}>
-                  {transactionToDelete.category_type === 'INCOME' ? '+' : '-'}
-                  ${parseFloat(transactionToDelete.amount).toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{transactionToDelete.category_name}</span>
-                <span>{new Date(transactionToDelete.spent_at).toLocaleDateString()}</span>
-              </div>
-            </div>
-
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setTransactionToDelete(null);
-                }}
-                className="flex-1 py-2.5 px-4 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex-1 py-2.5 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold"
-              >
-                Delete
-              </button>
-            </div>
           </div>
         </div>
       )}
