@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from rest_framework_simplejwt.views import TokenRefreshView
 from accounts.views import register_view, login_view, reset_password_view
 from transactions.views import (
     transaction_detail, transactions, transactions_summary,
@@ -29,6 +30,7 @@ urlpatterns = [
     path("api/auth/register", register_view, name="register"),
     path("api/auth/login", login_view, name="login"),
     path("api/auth/reset-password", reset_password_view, name="reset-password"),
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     # Transactions
     path("api/transactions", transactions, name="transactions"),
