@@ -26,39 +26,25 @@ interface Category {
   type: 'INCOME' | 'EXPENSE';
 }
 
+interface Summary {
+  income: number;
+  expense: number;
+  balance: number;
+}
+
 interface TransactionResponse {
   count: number;
   results: Transaction[];
 }
 
-export default function TransactionsPage() {
+export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useDispatch();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
-  
-  // Filters
-  const [filterType, setFilterType] = useState<'all' | 'INCOME' | 'EXPENSE'>('all');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-
-  // Modal state
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  // Form state
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [spentAt, setSpentAt] = useState(new Date().toISOString().split('T')[0]);
-  const [currency, setCurrency] = useState('USD');
-  const [selectedCategory, setSelectedCategory] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -67,6 +53,7 @@ export default function TransactionsPage() {
       return;
     }
 
+    // Load theme
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     const initialTheme = savedTheme || systemTheme;
@@ -74,14 +61,8 @@ export default function TransactionsPage() {
     setTheme(initialTheme);
     document.documentElement.classList.toggle('dark', initialTheme === 'dark');
 
-    fetchData();
+    fetchDashboardData();
   }, [router]);
-
-  useEffect(() => {
-    if (!loading) {
-      fetchData();
-    }
-  }, [dateFrom, dateTo]);
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
@@ -90,26 +71,28 @@ export default function TransactionsPage() {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
-  const fetchData = async () => {
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
       
-      const params = new URLSearchParams();
-      if (dateFrom) params.append('from', dateFrom);
-      if (dateTo) params.append('to', dateTo);
-      const queryString = params.toString();
-
-      const [transactionsRes, categoriesRes] = await Promise.all([
-        api.get(`/transactions${queryString ? '?' + queryString : ''}`),
+      const [summaryRes, transactionsRes, categoriesRes] = await Promise.all([
+        api.get('/transactions/summary'),
+        api.get('/transactions'),
         api.get('/categories')
       ]);
 
+      setSummary(summaryRes.data);
+      
       const transactionData = transactionsRes.data as TransactionResponse;
-      setTransactions(transactionData.results || []);
+      setRecentTransactions((transactionData.results || []).slice(0, 10));
+      
       setCategories(categoriesRes.data || []);
     } catch (error: any) {
-      console.error('Failed to fetch data:', error);
+      console.error('Failed to fetch dashboard data:', error);
+      
       if (error.response?.status === 401) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
         router.push('/login');
       }
     } finally {
@@ -124,130 +107,44 @@ export default function TransactionsPage() {
     router.push('/');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!amount || !spentAt) {
-      alert('Please fill in amount and date');
-      return;
-    }
-
-    const amountNum = parseFloat(amount);
-    if (amountNum <= 0) {
-      alert('Amount must be greater than 0');
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      // Set time to noon to avoid timezone issues
-      const spentAtISO = new Date(`${spentAt}T12:00:00`).toISOString();
-      
-      const payload: any = {
-        amount: amountNum,
-        currency: currency.toUpperCase(),
-        note: note.trim(),
-        spent_at: spentAtISO,
-      };
-
-      if (selectedCategory) {
-        payload.category = selectedCategory;
-      }
-
-      if (editingTransaction) {
-        await api.put(`/transactions/${editingTransaction.id}`, payload);
-      } else {
-        await api.post('/transactions', payload);
-      }
-
-      resetForm();
-      fetchData();
-    } catch (error: any) {
-      console.error('Failed to save transaction:', error);
-      const errorData = error.response?.data;
-      let errorMsg = 'Failed to save transaction';
-      
-      if (typeof errorData === 'object') {
-        const errors = Object.entries(errorData)
-          .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-          .join('\n');
-        errorMsg = errors;
-      }
-      
-      alert(errorMsg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const confirmDelete = (transaction: Transaction) => {
-    setTransactionToDelete(transaction);
-    setShowDeleteModal(true);
-  };
-
-  const handleDelete = async () => {
-    if (!transactionToDelete) return;
-
-    try {
-      await api.delete(`/transactions/${transactionToDelete.id}`);
-      setShowDeleteModal(false);
-      setTransactionToDelete(null);
-      fetchData();
-    } catch (error) {
-      console.error('Failed to delete transaction:', error);
-      alert('Failed to delete transaction. Please try again.');
-    }
-  };
-
-  const handleEdit = (transaction: Transaction) => {
-    setEditingTransaction(transaction);
-    setAmount(transaction.amount);
-    setNote(transaction.note || '');
-    
-    const spentDate = new Date(transaction.spent_at);
-    setSpentAt(spentDate.toISOString().split('T')[0]);
-    
-    setCurrency(transaction.currency);
-    setSelectedCategory(transaction.category || '');
-    setShowAddModal(true);
-  };
-
-  const resetForm = () => {
-    setAmount('');
-    setNote('');
-    setSpentAt(new Date().toISOString().split('T')[0]);
-    setCurrency('USD');
-    setSelectedCategory('');
-    setEditingTransaction(null);
-    setShowAddModal(false);
-  };
-
-  const filteredTransactions = transactions.filter(t => {
-    const matchesType = filterType === 'all' || t.category_type === filterType;
-    const matchesCategory = filterCategory === 'all' || t.category === filterCategory;
-    const matchesSearch = !searchQuery || (t.note && t.note.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesType && matchesCategory && matchesSearch;
-  });
-
-  const totalIncome = filteredTransactions
-    .filter(t => t.category_type === 'INCOME')
-    .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-  
-  const totalExpenses = filteredTransactions
-    .filter(t => t.category_type === 'EXPENSE')
-    .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading transactions...</p>
+          <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     );
   }
+
+  const balance = summary?.balance || 0;
+  const income = summary?.income || 0;
+  const expenses = summary?.expense || 0;
+  const savingsRate = income > 0 ? Math.round(((income - expenses) / income) * 100) : 0;
+
+  // Calculate spending breakdown by category
+  const spendingBreakdown = categories
+    .filter(cat => cat.type === 'EXPENSE')
+    .map(cat => {
+      const categoryTransactions = recentTransactions.filter(
+        t => t.category === cat.id && t.category_type === 'EXPENSE'
+      );
+      const categoryTotal = categoryTransactions.reduce(
+        (sum, t) => sum + parseFloat(t.amount), 
+        0
+      );
+      const percentage = expenses > 0 ? (categoryTotal / expenses) * 100 : 0;
+      
+      return {
+        category: cat.name,
+        amount: categoryTotal,
+        percentage: percentage
+      };
+    })
+    .filter(item => item.amount > 0)
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
 
   return (
     <div className="min-h-screen bg-background">
@@ -255,25 +152,27 @@ export default function TransactionsPage() {
       <nav className="border-b border-border bg-card sticky top-0 z-50 backdrop-blur">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
+            {/* Logo */}
             <Link href="/" className="flex items-center space-x-2 group">
               <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center group-hover:scale-110 transition-transform">
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <span className="text-lg font-bold text-foreground">Prism</span>
+              <span className="text-lg font-bold text-foreground">Budgetly</span>
             </Link>
 
+            {/* Nav Links */}
             <div className="flex items-center space-x-6">
               <Link 
                 href="/dashboard" 
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                className="text-sm font-medium text-primary border-b-2 border-primary pb-0.5"
               >
                 Dashboard
               </Link>
               <Link 
                 href="/transactions" 
-                className="text-sm font-medium text-primary border-b-2 border-primary pb-0.5"
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
                 Transactions
               </Link>
@@ -284,6 +183,7 @@ export default function TransactionsPage() {
                 Categories
               </Link>
 
+              {/* Theme Toggle */}
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-lg border border-border hover:bg-accent transition-colors"
@@ -300,6 +200,7 @@ export default function TransactionsPage() {
                 )}
               </button>
               
+              {/* Logout */}
               <button
                 onClick={handleLogout}
                 className="text-sm font-medium text-muted-foreground hover:text-red-500 transition-colors flex items-center space-x-1"
@@ -319,38 +220,40 @@ export default function TransactionsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-1">Transactions</h1>
-            <p className="text-muted-foreground">Manage all your income and expenses</p>
+            <h1 className="text-3xl font-bold text-foreground mb-1">Dashboard</h1>
+            <p className="text-muted-foreground">Your financial overview</p>
           </div>
 
-          <button
-            onClick={() => setShowAddModal(true)}
+          {/* Add Transaction Button */}
+          <Link
+            href="/transactions"
             className="px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:opacity-90 transition-opacity flex items-center space-x-2 shadow-lg"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
             <span>Add Transaction</span>
-          </button>
+          </Link>
         </div>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-card border border-border rounded-xl p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          {/* Balance Card */}
+          <div className="bg-gradient-to-br from-primary to-primary/80 rounded-xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-lg bg-white/20 flex items-center justify-center">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-foreground">{filteredTransactions.length}</div>
-                <div className="text-sm text-muted-foreground">Total Transactions</div>
-              </div>
+              <div className="text-sm font-medium opacity-90">Savings: {savingsRate}%</div>
             </div>
+            <div className="text-3xl font-bold mb-1">${balance.toFixed(2)}</div>
+            <div className="text-sm opacity-90">Current Balance</div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-6">
+          {/* Income Card */}
+          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
                 <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -358,13 +261,14 @@ export default function TransactionsPage() {
                 </svg>
               </div>
               <div>
-                <div className="text-2xl font-bold text-green-500">${totalIncome.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-foreground">${income.toFixed(2)}</div>
                 <div className="text-sm text-muted-foreground">Total Income</div>
               </div>
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-6">
+          {/* Expenses Card */}
+          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 rounded-lg bg-red-500/10 flex items-center justify-center">
                 <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -372,382 +276,176 @@ export default function TransactionsPage() {
                 </svg>
               </div>
               <div>
-                <div className="text-2xl font-bold text-red-500">${totalExpenses.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-foreground">${expenses.toFixed(2)}</div>
                 <div className="text-sm text-muted-foreground">Total Expenses</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-card border border-border rounded-xl p-6 mb-8">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Filters</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Type</label>
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value as any)}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 0.75rem center',
-                  backgroundSize: '1.25rem'
-                }}
+        {/* Recent Transactions & Spending Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Recent Transactions */}
+          <div className="bg-card border border-border rounded-xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-foreground">Recent Transactions</h2>
+              <Link 
+                href="/transactions"
+                className="text-sm text-primary hover:underline font-medium"
               >
-                <option value="all">All Types</option>
-                <option value="INCOME">Income</option>
-                <option value="EXPENSE">Expense</option>
-              </select>
+                View all
+              </Link>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Category</label>
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 0.75rem center',
-                  backgroundSize: '1.25rem'
-                }}
-              >
-                <option value="all">All Categories</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
+            {recentTransactions.length === 0 ? (
+              <div className="text-center py-12">
+                <svg className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p className="text-muted-foreground">No transactions yet</p>
+                <p className="text-sm text-muted-foreground mt-1">Add your first transaction to get started</p>
+                <Link
+                  href="/transactions"
+                  className="inline-block mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+                >
+                  Add Transaction
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentTransactions.map((transaction) => (
+                  <div 
+                    key={transaction.id} 
+                    className="flex items-center justify-between p-4 bg-background border border-border rounded-lg hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        transaction.category_type === 'INCOME' 
+                          ? 'bg-green-500/10' 
+                          : 'bg-red-500/10'
+                      }`}>
+                        <svg 
+                          className={`w-5 h-5 ${
+                            transaction.category_type === 'INCOME' 
+                              ? 'text-green-500' 
+                              : 'text-red-500'
+                          }`} 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={
+                            transaction.category_type === 'INCOME'
+                              ? "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                              : "M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"
+                          } />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="font-medium text-foreground">
+                          {transaction.note || transaction.category_name || 'No note'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {transaction.category_name || 'Uncategorized'} • {new Date(transaction.spent_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={`font-bold ${
+                      transaction.category_type === 'INCOME' 
+                        ? 'text-green-500' 
+                        : 'text-red-500'
+                    }`}>
+                      {transaction.category_type === 'INCOME' ? '+' : '-'}
+                      ${parseFloat(transaction.amount).toFixed(2)}
+                    </div>
+                  </div>
                 ))}
-              </select>
-            </div>
+              </div>
+            )}
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">From Date</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+          {/* Spending Breakdown */}
+          <div className="bg-card border border-border rounded-xl p-6">
+            <h2 className="text-xl font-bold text-foreground mb-6">Spending Breakdown</h2>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">To Date</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+            {spendingBreakdown.length === 0 ? (
+              <div className="text-center py-12">
+                <svg className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <p className="text-muted-foreground">No spending data yet</p>
+                <p className="text-sm text-muted-foreground mt-1">Start adding expenses to see your breakdown</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {spendingBreakdown.map((item, index) => (
+                  <div key={index}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-foreground">
+                        {item.category}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        ${item.amount.toFixed(2)} ({item.percentage.toFixed(0)}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-border rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary transition-all duration-300"
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Search</label>
-              <input
-                type="text"
-                placeholder="Search notes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+        {/* Quick Stats */}
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-foreground">{recentTransactions.length}</div>
+                <div className="text-sm text-muted-foreground">Recent Transactions</div>
+              </div>
             </div>
           </div>
 
-          {(dateFrom || dateTo || filterType !== 'all' || filterCategory !== 'all' || searchQuery) && (
-            <div className="mt-4">
-              <button
-                onClick={() => {
-                  setDateFrom('');
-                  setDateTo('');
-                  setFilterType('all');
-                  setFilterCategory('all');
-                  setSearchQuery('');
-                }}
-                className="text-sm text-primary hover:underline"
-              >
-                Clear all filters
-              </button>
+          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-foreground">{categories.length}</div>
+                <div className="text-sm text-muted-foreground">Categories</div>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Transactions List */}
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          {filteredTransactions.length === 0 ? (
-            <div className="text-center py-12">
-              <svg className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <p className="text-muted-foreground">No transactions found</p>
-              <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters or add a new transaction</p>
+          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-foreground">{savingsRate}%</div>
+                <div className="text-sm text-muted-foreground">Savings Rate</div>
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Date</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Type</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Category</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Note</th>
-                    <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">Amount</th>
-                    <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredTransactions.map((transaction) => {
-                    const spentDate = new Date(transaction.spent_at);
-                    
-                    return (
-                      <tr key={transaction.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-4 text-sm text-foreground">
-                          {spentDate.toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            transaction.category_type === 'INCOME'
-                              ? 'bg-green-500/10 text-green-500'
-                              : 'bg-red-500/10 text-red-500'
-                          }`}>
-                            {transaction.category_type || 'N/A'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {transaction.category_name || 'Uncategorized'}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-foreground max-w-xs truncate">
-                          {transaction.note || '-'}
-                        </td>
-                        <td className={`px-6 py-4 text-sm font-semibold text-right ${
-                          transaction.category_type === 'INCOME' ? 'text-green-500' : 'text-red-500'
-                        }`}>
-                          {transaction.category_type === 'INCOME' ? '+' : '-'}
-                          ${parseFloat(transaction.amount).toFixed(2)} {transaction.currency}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end space-x-2">
-                            <button
-                              onClick={() => handleEdit(transaction)}
-                              className="p-2 text-muted-foreground hover:text-primary transition-colors"
-                              title="Edit"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => confirmDelete(transaction)}
-                              className="p-2 text-muted-foreground hover:text-red-500 transition-colors"
-                              title="Delete"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          </div>
         </div>
       </div>
-
-      {/* Add/Edit Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-foreground">
-                {editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
-              </h2>
-              <button
-                onClick={resetForm}
-                className="p-2 rounded-lg hover:bg-muted transition-colors"
-              >
-                <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Amount */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Amount <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                  placeholder="0.00"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              {/* Currency */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Currency</label>
-                <input
-                  type="text"
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                  maxLength={3}
-                  placeholder="USD"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <p className="text-xs text-muted-foreground mt-1">3-letter currency code (e.g., USD, EUR)</p>
-              </div>
-
-              {/* Date Only */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={spentAt}
-                  onChange={(e) => setSpentAt(e.target.value)}
-                  required
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              {/* Category (Optional) */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Category <span className="text-xs text-muted-foreground">(Optional - Auto-categorizes if empty)</span>
-                </label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.75rem center',
-                    backgroundSize: '1.25rem'
-                  }}
-                >
-                  <option value="">All Categories (Auto-categorize)</option>
-                  <optgroup label="Income" className="bg-background text-foreground">
-                    {categories.filter(c => c.type === 'INCOME').map(category => (
-                      <option key={category.id} value={category.id} className="py-2">
-                        {category.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Expense" className="bg-background text-foreground">
-                    {categories.filter(c => c.type === 'EXPENSE').map(category => (
-                      <option key={category.id} value={category.id} className="py-2">
-                        {category.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
-
-              {/* Note */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Note</label>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  maxLength={255}
-                  rows={3}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                  placeholder="Add a note about this transaction..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">{note.length}/255 characters</p>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  disabled={submitting}
-                  className="flex-1 py-2.5 px-4 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 py-2.5 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity font-semibold disabled:opacity-50"
-                >
-                  {submitting ? 'Saving...' : editingTransaction ? 'Update' : 'Add'} Transaction
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && transactionToDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-foreground">Delete Transaction</h3>
-                <p className="text-sm text-muted-foreground">This action cannot be undone</p>
-              </div>
-            </div>
-
-            <div className="bg-muted/30 rounded-lg p-4 mb-6">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-sm font-medium text-foreground">
-                  {transactionToDelete.note || transactionToDelete.category_name || 'Transaction'}
-                </span>
-                <span className={`text-sm font-bold ${
-                  transactionToDelete.category_type === 'INCOME' ? 'text-green-500' : 'text-red-500'
-                }`}>
-                  {transactionToDelete.category_type === 'INCOME' ? '+' : '-'}
-                  ${parseFloat(transactionToDelete.amount).toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{transactionToDelete.category_name}</span>
-                <span>{new Date(transactionToDelete.spent_at).toLocaleDateString()}</span>
-              </div>
-            </div>
-
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setTransactionToDelete(null);
-                }}
-                className="flex-1 py-2.5 px-4 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex-1 py-2.5 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
