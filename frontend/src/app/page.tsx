@@ -2,19 +2,36 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function LandingPage() {
+  const router = useRouter();
   const [isDark, setIsDark] = useState(false);
   const [balance, setBalance] = useState(1340);
   const [income, setIncome] = useState(3557);
   const [expenses, setExpenses] = useState(2273);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
+  const [isClient, setIsClient] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    setIsClient(true);
+    const token = localStorage.getItem('access_token');
+    setIsLoggedIn(!!token);
+
+    // Load theme preference
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
       setIsDark(true);
       document.documentElement.classList.add('dark');
+    } else if (savedTheme === 'light') {
+      setIsDark(false);
+      document.documentElement.classList.remove('dark');
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
     }
 
     const interval = setInterval(() => {
@@ -34,18 +51,145 @@ export default function LandingPage() {
   };
 
   const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark');
+    const newTheme = !isDark;
+    setIsDark(newTheme);
+    
+    if (newTheme) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
   };
 
   const savingsRate = Math.round(((balance / income) * 100));
 
+  // POST-LOGIN VIEW
+  if (isClient && isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-background relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/10" />
+        
+        <nav className="relative z-50 border-b border-border bg-background/80 backdrop-blur-sm">
+          <div className="max-w-6xl mx-auto px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <span className="text-lg font-semibold text-foreground">Prism</span>
+              </div>
+
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={toggleTheme}
+                  className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  {isDark ? (
+                    <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                  )}
+                </button>
+                
+                <Link
+                  href="/dashboard"
+                  className="bg-primary text-white px-5 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                >
+                  Dashboard
+                </Link>
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        <div className="relative z-10 flex items-center justify-center min-h-[calc(100vh-4rem)] py-20">
+          <div className="max-w-3xl mx-auto px-6 text-center space-y-10">
+            <div className="inline-flex items-center px-4 py-2 rounded-full bg-success/10 border border-success/20 text-success text-sm font-medium animate-fade-in">
+              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              You're logged in
+            </div>
+
+            <div className="space-y-4">
+              <h1 className="text-5xl sm:text-6xl font-bold text-foreground">
+                Welcome back! 👋
+              </h1>
+              <p className="text-xl text-muted-foreground">
+                Your financial dashboard is ready
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-8">
+              <Link
+                href="/dashboard"
+                className="group bg-card/80 backdrop-blur-sm border border-border rounded-2xl p-6 hover:shadow-xl transition-all hover:-translate-y-1"
+              >
+                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:bg-primary/20 transition-all">
+                  <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                </div>
+                <div className="text-sm font-semibold text-foreground mb-1">Dashboard</div>
+                <div className="text-xs text-muted-foreground">View overview</div>
+              </Link>
+
+              <Link
+                href="/transactions"
+                className="group bg-card/80 backdrop-blur-sm border border-border rounded-2xl p-6 hover:shadow-xl transition-all hover:-translate-y-1"
+              >
+                <div className="w-14 h-14 rounded-xl bg-accent/10 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:bg-accent/20 transition-all">
+                  <svg className="w-7 h-7 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="text-sm font-semibold text-foreground mb-1">Transactions</div>
+                <div className="text-xs text-muted-foreground">Add expenses</div>
+              </Link>
+
+              <Link
+                href="/categories"
+                className="group bg-card/80 backdrop-blur-sm border border-border rounded-2xl p-6 hover:shadow-xl transition-all hover:-translate-y-1"
+              >
+                <div className="w-14 h-14 rounded-xl bg-success/10 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:bg-success/20 transition-all">
+                  <svg className="w-7 h-7 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+                <div className="text-sm font-semibold text-foreground mb-1">Categories</div>
+                <div className="text-xs text-muted-foreground">Manage groups</div>
+              </Link>
+            </div>
+
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center bg-primary text-white px-10 py-4 rounded-xl text-lg font-semibold hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:scale-105"
+            >
+              Go to Dashboard
+              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // REGULAR LANDING PAGE
   return (
     <div 
       className="min-h-screen bg-background transition-colors duration-300 relative overflow-hidden"
       onMouseMove={handleMouseMove}
     >
-      {/* Dynamic Gradient Background */}
       <div 
         className="fixed inset-0 opacity-20 pointer-events-none transition-all duration-300"
         style={{
@@ -53,7 +197,6 @@ export default function LandingPage() {
         }}
       />
 
-      {/* Navigation */}
       <nav className="relative z-50 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0">
         <div className="max-w-6xl mx-auto px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -93,7 +236,6 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section - TIGHTER SPACING */}
       <section className="relative py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -108,7 +250,7 @@ export default function LandingPage() {
                 Stop guessing where your money goes. See it, understand it, control it.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-4 mb-8">
                 <Link
                   href="/register"
                   className="inline-flex items-center justify-center bg-primary text-white px-8 py-4 rounded-xl text-lg font-semibold hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:scale-105"
@@ -125,6 +267,27 @@ export default function LandingPage() {
                 >
                   Learn More
                 </Link>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
+                <div className="flex items-center space-x-2">
+                  <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span>Free forever</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span>No credit card</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span>Private data</span>
+                </div>
               </div>
             </div>
 
@@ -195,7 +358,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features - Bento Grid */}
       <section id="features" className="relative py-20 bg-muted/30">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -310,7 +472,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* How It Works */}
       <section className="py-20 relative">
         <div className="max-w-4xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -342,10 +503,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer - Copyright Only */}
-      <footer className="border-t border-border py-6 bg-card mt-20">
+      <footer className="border-t border-border py-6 bg-card">
         <div className="max-w-6xl mx-auto px-6 lg:px-8 text-center text-sm text-muted-foreground">
-          © 2025 Prism • Built by Krishna Madani
+          © 2025 Prism
         </div>
       </footer>
     </div>
