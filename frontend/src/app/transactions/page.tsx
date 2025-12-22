@@ -7,6 +7,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { clearAuth } from '@/lib/authSlice';
 import { toast } from 'react-hot-toast';
+import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/exportUtils';
 
 interface Transaction {
   id: string;
@@ -59,6 +60,7 @@ export default function TransactionsPage() {
   const [spentAtTime, setSpentAtTime] = useState('12:00');
   const [currency, setCurrency] = useState('USD');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -136,41 +138,53 @@ export default function TransactionsPage() {
         toast.error('No transactions to export');
         return;
       }
-
-      const headers = ['Date', 'Time', 'Type', 'Category', 'Note', 'Amount', 'Currency'];
-      const rows = filteredTransactions.map(t => {
-        const date = new Date(t.spent_at);
-        return [
-          date.toLocaleDateString(),
-          date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          t.category_type || 'N/A',
-          t.category_name || 'Uncategorized',
-          t.note || '',
-          t.amount,
-          t.currency
-        ];
-      });
-
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      
-      link.setAttribute('href', url);
-      link.setAttribute('download', `transactions_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success('Transactions exported successfully');
+      exportToCSV(filteredTransactions);
+      toast.success('Transactions exported to CSV');
     } catch (error) {
-      console.error('Export error:', error);
-      toast.error('Failed to export transactions');
+      console.error('CSV export error:', error);
+      toast.error('Failed to export CSV');
+    }
+  };
+
+  const handleExportExcel = () => {
+    try {
+      if (filteredTransactions.length === 0) {
+        toast.error('No transactions to export');
+        return;
+      }
+
+      const summary = {
+        income: totalIncome,
+        expense: totalExpenses,
+        balance: totalIncome - totalExpenses
+      };
+
+      exportToExcel(filteredTransactions, categories, summary);
+      toast.success('Transactions exported to Excel');
+    } catch (error) {
+      console.error('Excel export error:', error);
+      toast.error('Failed to export Excel');
+    }
+  };
+
+  const handleExportPDF = () => {
+    try {
+      if (filteredTransactions.length === 0) {
+        toast.error('No transactions to export');
+        return;
+      }
+
+      const summary = {
+        income: totalIncome,
+        expense: totalExpenses,
+        balance: totalIncome - totalExpenses
+      };
+
+      exportToPDF(filteredTransactions, categories, summary);
+      toast.success('Transactions exported to PDF');
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast.error('Failed to export PDF');
     }
   };
 
@@ -348,16 +362,62 @@ export default function TransactionsPage() {
           </div>
 
           <div className="flex items-center space-x-3">
-            <button
-              onClick={handleExportCSV}
-              disabled={filteredTransactions.length === 0}
-              className="px-4 py-2 bg-background border border-border text-foreground font-medium rounded-lg hover:bg-muted transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span>Export CSV</span>
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={filteredTransactions.length === 0}
+                className="px-4 py-2 bg-background border border-border text-foreground font-medium rounded-lg hover:bg-muted transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Export</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-10">
+                  <button
+                    onClick={() => {
+                      handleExportCSV();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors flex items-center space-x-2 rounded-t-lg"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Export as CSV</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportExcel();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors flex items-center space-x-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span>Export as Excel</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportPDF();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors flex items-center space-x-2 rounded-b-lg"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span>Export as PDF</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
             <button
               onClick={() => setShowAddModal(true)}

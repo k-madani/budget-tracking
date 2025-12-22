@@ -7,6 +7,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { clearAuth } from '@/lib/authSlice';
 import { toast } from 'react-hot-toast';
+import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/exportUtils';
 import { LineChart, Line, PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 
 interface Transaction {
@@ -52,6 +53,7 @@ export default function AnalyticsPage() {
     const [loading, setLoading] = useState(true);
     const [theme, setTheme] = useState<'light' | 'dark'>('dark');
     const [timeRange, setTimeRange] = useState<'7days' | '30days' | 'all'>('30days');
+    const [showExportMenu, setShowExportMenu] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem('access_token');

@@ -63,25 +63,21 @@ export default function DashboardPage() {
     try {
       setLoading(true);
 
-      // Fetch summary and transactions
       const [summaryRes, transactionsRes, categoriesRes] = await Promise.all([
         api.get('/transactions/summary'),
         api.get('/transactions'),
         api.get('/categories')
       ]);
 
-      // Set summary data
       if (summaryRes.data) {
         setBalance(summaryRes.data.balance || 0);
         setIncome(summaryRes.data.income || 0);
         setExpenses(summaryRes.data.expense || 0);
       }
 
-      // Set recent transactions (last 10)
       const allTransactions = transactionsRes.data.results || transactionsRes.data || [];
       setRecentTransactions(allTransactions.slice(0, 10));
 
-      // Set categories
       setCategories(categoriesRes.data || []);
 
     } catch (error: any) {
@@ -112,7 +108,6 @@ export default function DashboardPage() {
 
   const savingsRate = income > 0 ? Math.round(((income - expenses) / income) * 100) : 0;
 
-  // Calculate spending breakdown for top categories
   const getSpendingBreakdown = () => {
     if (recentTransactions.length === 0) return [];
 
@@ -193,7 +188,7 @@ export default function DashboardPage() {
 
               <button
                 onClick={toggleTheme}
-                className="p-2 rounded-lg border border-border hover:bg-accent transition-colors"
+                className="p-2 rounded-lg border border-border hover:bg-primary/10 hover:border-primary transition-all"
                 aria-label="Toggle theme"
               >
                 {theme === 'dark' ? (
@@ -239,7 +234,6 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-center space-x-3">
@@ -284,9 +278,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Transactions & Spending Breakdown */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Recent Transactions */}
           <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-foreground">Recent Transactions</h2>
@@ -349,7 +341,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Spending Breakdown */}
           <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-foreground">Spending Breakdown</h2>
@@ -395,7 +386,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick Stats */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex items-center space-x-3">
