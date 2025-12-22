@@ -213,6 +213,7 @@ export default function CategoriesPage() {
               <Link href="/transactions" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Transactions</Link>
               <Link href="/categories" className="text-sm font-medium text-primary border-b-2 border-primary pb-0.5">Categories</Link>
               <Link href="/analytics" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Analytics</Link>
+              <Link href="/profile" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Profile</Link>
 
               <button onClick={toggleTheme} className="p-2 rounded-lg border border-border hover:bg-accent transition-colors">
                 {theme === 'dark' ? (

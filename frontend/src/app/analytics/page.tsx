@@ -105,11 +105,15 @@ export default function AnalyticsPage() {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        dispatch(clearAuth());
-        toast.success('Logged out successfully');
-        router.push('/');
+        try {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            dispatch(clearAuth());
+            toast.success('Logged out successfully');
+            router.push('/');
+        } catch (error) {
+            toast.error('Failed to logout');
+        }
     };
 
     const handleExportCSV = () => {
@@ -146,7 +150,7 @@ export default function AnalyticsPage() {
             link.click();
             document.body.removeChild(link);
 
-            toast.success('Analytics data exported successfully!');
+            toast.success('Analytics exported successfully');
         } catch (error) {
             console.error('Export error:', error);
             toast.error('Failed to export data');
@@ -489,12 +493,13 @@ export default function AnalyticsPage() {
                     <div className="flex items-center space-x-3">
                         <button
                             onClick={handleExportCSV}
-                            className="px-4 py-2 bg-background border border-border text-foreground font-medium rounded-lg hover:bg-muted transition-colors flex items-center space-x-2"
+                            disabled={transactions.length === 0}
+                            className="px-4 py-2 bg-background border border-border text-foreground font-medium rounded-lg hover:bg-muted transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            <span>Export</span>
+                            <span>Export CSV</span>
                         </button>
 
                         <div className="flex items-center space-x-2 bg-card border border-border rounded-lg p-1">
@@ -639,10 +644,7 @@ export default function AnalyticsPage() {
                                                         color: theme === 'dark' ? '#F3F4F6' : '#1F2937'
                                                     }}
                                                     formatter={(value: any) => `$${value.toFixed(2)}`}
-                                                    itemStyle={{
-                                                        color: theme === 'dark' ? '#F3F4F6' : '#1F2937',
-                                                        fontSize: '12px'
-                                                    }}
+                                                    itemStyle={{ color: theme === 'dark' ? '#F3F4F6' : '#1F2937', fontSize: '12px' }}
                                                 />
                                             </PieChart>
                                         </ResponsiveContainer>
@@ -759,8 +761,7 @@ export default function AnalyticsPage() {
                                 <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center">
                                     <p className="text-xs text-muted-foreground mb-1">Net Savings</p>
                                     <p className="text-xl font-bold text-primary">
-                                        ${((incomeExpenseData.find(d => d.name === 'Income')?.amount || 0) - 
-                                        (incomeExpenseData.find(d => d.name === 'Expenses')?.amount || 0)).toFixed(2)}
+                                        ${((incomeExpenseData.find(d => d.name === 'Income')?.amount || 0) - (incomeExpenseData.find(d => d.name === 'Expenses')?.amount || 0)).toFixed(2)}
                                     </p>
                                 </div>
                             </div>

@@ -6,6 +6,7 @@ import { useDispatch } from 'react-redux';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { clearAuth } from '@/lib/authSlice';
+import { toast } from 'react-hot-toast';
 
 interface Transaction {
   id: string;
@@ -66,7 +67,6 @@ export default function TransactionsPage() {
       return;
     }
 
-    // Load theme
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     const initialTheme = savedTheme || systemTheme;
@@ -77,7 +77,6 @@ export default function TransactionsPage() {
     fetchData();
   }, [router]);
 
-  // Fetch data when date filters change
   useEffect(() => {
     if (!loading) {
       fetchData();
@@ -95,7 +94,6 @@ export default function TransactionsPage() {
     try {
       setLoading(true);
       
-      // Build query params for date filtering
       const params = new URLSearchParams();
       if (dateFrom) params.append('from', dateFrom);
       if (dateTo) params.append('to', dateTo);
@@ -111,6 +109,7 @@ export default function TransactionsPage() {
       setCategories(categoriesRes.data || []);
     } catch (error: any) {
       console.error('Failed to fetch data:', error);
+      toast.error('Failed to load transactions');
       if (error.response?.status === 401) {
         router.push('/login');
       }
@@ -120,31 +119,78 @@ export default function TransactionsPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    dispatch(clearAuth());
-    router.push('/');
+    try {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      dispatch(clearAuth());
+      toast.success('Logged out successfully');
+      router.push('/');
+    } catch (error) {
+      toast.error('Failed to logout');
+    }
+  };
+
+  const handleExportCSV = () => {
+    try {
+      if (filteredTransactions.length === 0) {
+        toast.error('No transactions to export');
+        return;
+      }
+
+      const headers = ['Date', 'Time', 'Type', 'Category', 'Note', 'Amount', 'Currency'];
+      const rows = filteredTransactions.map(t => {
+        const date = new Date(t.spent_at);
+        return [
+          date.toLocaleDateString(),
+          date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          t.category_type || 'N/A',
+          t.category_name || 'Uncategorized',
+          t.note || '',
+          t.amount,
+          t.currency
+        ];
+      });
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `transactions_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success('Transactions exported successfully');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export transactions');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!amount || !spentAt) {
-      alert('Please fill in amount and date');
+      toast.error('Please fill in amount and date');
       return;
     }
 
-    // Validate amount
     const amountNum = parseFloat(amount);
     if (amountNum <= 0) {
-      alert('Amount must be greater than 0');
+      toast.error('Amount must be greater than 0');
       return;
     }
 
     setSubmitting(true);
 
     try {
-      // Combine date and time into ISO format
       const spentAtISO = new Date(`${spentAt}T${spentAtTime}:00`).toISOString();
       
       const payload: any = {
@@ -154,15 +200,16 @@ export default function TransactionsPage() {
         spent_at: spentAtISO,
       };
 
-      // Only include category if selected (backend handles auto-categorization)
       if (selectedCategory) {
         payload.category = selectedCategory;
       }
 
       if (editingTransaction) {
         await api.put(`/transactions/${editingTransaction.id}`, payload);
+        toast.success('Transaction updated successfully');
       } else {
         await api.post('/transactions', payload);
+        toast.success('Transaction added successfully');
       }
 
       resetForm();
@@ -175,11 +222,11 @@ export default function TransactionsPage() {
       if (typeof errorData === 'object') {
         const errors = Object.entries(errorData)
           .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-          .join('\n');
+          .join('; ');
         errorMsg = errors;
       }
       
-      alert(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -190,10 +237,11 @@ export default function TransactionsPage() {
 
     try {
       await api.delete(`/transactions/${transactionId}`);
+      toast.success('Transaction deleted successfully');
       fetchData();
     } catch (error) {
       console.error('Failed to delete transaction:', error);
-      alert('Failed to delete transaction. Please try again.');
+      toast.error('Failed to delete transaction');
     }
   };
 
@@ -202,7 +250,6 @@ export default function TransactionsPage() {
     setAmount(transaction.amount);
     setNote(transaction.note || '');
     
-    // Parse spent_at to date and time
     const spentDate = new Date(transaction.spent_at);
     setSpentAt(spentDate.toISOString().split('T')[0]);
     setSpentAtTime(spentDate.toTimeString().slice(0, 5));
@@ -223,7 +270,6 @@ export default function TransactionsPage() {
     setShowAddModal(false);
   };
 
-  // Filter transactions locally
   const filteredTransactions = transactions.filter(t => {
     const matchesType = filterType === 'all' || t.category_type === filterType;
     const matchesCategory = filterCategory === 'all' || t.category === filterCategory;
@@ -231,7 +277,6 @@ export default function TransactionsPage() {
     return matchesType && matchesCategory && matchesSearch;
   });
 
-  // Calculate totals
   const totalIncome = filteredTransactions
     .filter(t => t.category_type === 'INCOME')
     .reduce((sum, t) => sum + parseFloat(t.amount), 0);
@@ -253,7 +298,6 @@ export default function TransactionsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation Bar */}
       <nav className="border-b border-border bg-card sticky top-0 z-50 backdrop-blur">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -267,30 +311,13 @@ export default function TransactionsPage() {
             </Link>
 
             <div className="flex items-center space-x-6">
-              <Link 
-                href="/dashboard" 
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Dashboard
-              </Link>
-              <Link 
-                href="/transactions" 
-                className="text-sm font-medium text-primary border-b-2 border-primary pb-0.5"
-              >
-                Transactions
-              </Link>
-              <Link 
-                href="/categories" 
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Categories
-              </Link>
+              <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Dashboard</Link>
+              <Link href="/transactions" className="text-sm font-medium text-primary border-b-2 border-primary pb-0.5">Transactions</Link>
+              <Link href="/categories" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Categories</Link>
+              <Link href="/analytics" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Analytics</Link>
+              <Link href="/profile" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Profile</Link>
 
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-lg border border-border hover:bg-accent transition-colors"
-                aria-label="Toggle theme"
-              >
+              <button onClick={toggleTheme} className="p-2 rounded-lg border border-border hover:bg-accent transition-colors">
                 {theme === 'dark' ? (
                   <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -302,10 +329,7 @@ export default function TransactionsPage() {
                 )}
               </button>
               
-              <button
-                onClick={handleLogout}
-                className="text-sm font-medium text-muted-foreground hover:text-red-500 transition-colors flex items-center space-x-1"
-              >
+              <button onClick={handleLogout} className="text-sm font-medium text-muted-foreground hover:text-red-500 transition-colors flex items-center space-x-1">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
@@ -316,27 +340,37 @@ export default function TransactionsPage() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-1">Transactions</h1>
             <p className="text-muted-foreground">Manage all your income and expenses</p>
           </div>
 
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:opacity-90 transition-opacity flex items-center space-x-2 shadow-lg"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            <span>Add Transaction</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={handleExportCSV}
+              disabled={filteredTransactions.length === 0}
+              className="px-4 py-2 bg-background border border-border text-foreground font-medium rounded-lg hover:bg-muted transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Export CSV</span>
+            </button>
+
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:opacity-90 transition-opacity flex items-center space-x-2 shadow-lg"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span>Add Transaction</span>
+            </button>
+          </div>
         </div>
 
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex items-center space-x-3">
@@ -381,7 +415,6 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        {/* Filters */}
         <div className="bg-card border border-border rounded-xl p-6 mb-8">
           <h3 className="text-lg font-semibold text-foreground mb-4">Filters</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -446,7 +479,6 @@ export default function TransactionsPage() {
             </div>
           </div>
 
-          {/* Clear Filters Button */}
           {(dateFrom || dateTo || filterType !== 'all' || filterCategory !== 'all' || searchQuery) && (
             <div className="mt-4">
               <button
@@ -465,7 +497,6 @@ export default function TransactionsPage() {
           )}
         </div>
 
-        {/* Transactions List */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           {filteredTransactions.length === 0 ? (
             <div className="text-center py-12">
@@ -553,7 +584,6 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -561,10 +591,7 @@ export default function TransactionsPage() {
               <h2 className="text-2xl font-bold text-foreground">
                 {editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
               </h2>
-              <button
-                onClick={resetForm}
-                className="p-2 rounded-lg hover:bg-muted transition-colors"
-              >
+              <button onClick={resetForm} className="p-2 rounded-lg hover:bg-muted transition-colors">
                 <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -572,7 +599,6 @@ export default function TransactionsPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Amount */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   Amount <span className="text-red-500">*</span>
@@ -589,7 +615,6 @@ export default function TransactionsPage() {
                 />
               </div>
 
-              {/* Currency */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Currency</label>
                 <input
@@ -603,7 +628,6 @@ export default function TransactionsPage() {
                 <p className="text-xs text-muted-foreground mt-1">3-letter currency code (e.g., USD, EUR)</p>
               </div>
 
-              {/* Date and Time */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
@@ -628,7 +652,6 @@ export default function TransactionsPage() {
                 </div>
               </div>
 
-              {/* Category (Optional) */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   Category <span className="text-xs text-muted-foreground">(Optional - Auto-categorizes if empty)</span>
@@ -656,7 +679,6 @@ export default function TransactionsPage() {
                 </select>
               </div>
 
-              {/* Note */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Note</label>
                 <textarea
@@ -670,7 +692,6 @@ export default function TransactionsPage() {
                 <p className="text-xs text-muted-foreground mt-1">{note.length}/255 characters</p>
               </div>
 
-              {/* Buttons */}
               <div className="flex space-x-3 pt-4">
                 <button
                   type="button"

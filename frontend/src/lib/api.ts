@@ -1,4 +1,5 @@
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const api = axios.create({
   baseURL: 'http://127.0.0.1:8000/api',
@@ -7,7 +8,6 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
@@ -21,13 +21,11 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle 401 errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // If error is 401 and we haven't retried yet
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -35,14 +33,13 @@ api.interceptors.response.use(
         const refreshToken = localStorage.getItem('refresh_token');
         
         if (!refreshToken) {
-          // No refresh token, redirect to login
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
+          toast.error('Session expired. Please login again.');
           window.location.href = '/login';
           return Promise.reject(error);
         }
 
-        // Try to refresh the token
         const response = await axios.post('http://127.0.0.1:8000/api/token/refresh/', {
           refresh: refreshToken,
         });
@@ -50,13 +47,12 @@ api.interceptors.response.use(
         const { access } = response.data;
         localStorage.setItem('access_token', access);
 
-        // Retry original request with new token
         originalRequest.headers.Authorization = `Bearer ${access}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, clear tokens and redirect to login
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+        toast.error('Session expired. Please login again.');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
