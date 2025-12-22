@@ -1,11 +1,12 @@
 from rest_framework import serializers
+from django.db import models as django_models
 from .models import Transaction, Category
 
 class TransactionWriteSerializer(serializers.ModelSerializer):
     # Make category optional
     category = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(), 
-        required=False,  # ← Changed to optional
+        required=False,
         allow_null=True
     )
 
@@ -42,6 +43,25 @@ class TransactionReadSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "created_at", "updated_at", "category_name", "category_type")
 
 class CategorySerializer(serializers.ModelSerializer):
+    current_spending = serializers.SerializerMethodField()
+    
     class Meta:
         model = Category
-        fields = ("id", "name", "type")
+        fields = ("id", "name", "type", "budget_limit", "current_spending")
+    
+    def get_current_spending(self, obj):
+        """Calculate current month spending for this category"""
+        from django.utils import timezone
+        from datetime import datetime
+        
+        # Get current month's start and end
+        now = timezone.now()
+        month_start = datetime(now.year, now.month, 1)
+        
+        # Calculate spending for this category in current month
+        spending = obj.transactions.filter(
+            spent_at__gte=month_start,
+            spent_at__lte=now
+        ).aggregate(total=django_models.Sum('amount'))['total'] or 0
+        
+        return float(spending)
