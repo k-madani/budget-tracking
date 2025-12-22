@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import Link from 'next/link';
+import { toast } from 'react-hot-toast';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -12,11 +13,9 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
-  // Load theme on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -26,7 +25,6 @@ export default function RegisterPage() {
     document.documentElement.classList.toggle('dark', initialTheme === 'dark');
   }, []);
 
-  // Toggle theme
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
@@ -36,70 +34,106 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+
+    if (!userName || !email || !password || !confirmPassword) {
+      toast.error('Please fill in all fields');
+      return;
+    }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+      toast.error('Password must be at least 8 characters');
       return;
     }
 
     setLoading(true);
 
     try {
-      await api.post('/auth/register', { userName, email, password });
-      router.push('/login');
-    } catch (err: any) {
-      const errors = err.response?.data;
-      if (typeof errors === 'object') {
-        const errorMessages = Object.entries(errors)
-          .map(([key, value]) => `${Array.isArray(value) ? value.join(', ') : value}`)
+      await api.post('/users/register/', {
+        username: userName,
+        email: email,
+        password: password,
+      });
+
+      toast.success('Registration successful! Redirecting to login...');
+      setTimeout(() => {
+        router.push('/login');
+      }, 1500);
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      const errorData = error.response?.data;
+      
+      if (typeof errorData === 'object') {
+        const errorMessages = Object.entries(errorData)
+          .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
           .join('; ');
-        setError(errorMessages);
+        toast.error(errorMessages);
       } else {
-        setError('Registration failed. Please try again.');
+        const errorMsg = error.response?.data?.error || 
+                         error.response?.data?.message || 
+                         'Registration failed. Please try again.';
+        toast.error(errorMsg);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const passwordStrength = () => {
-    if (!password) return null;
-    if (password.length < 8) return { label: 'Too short', color: 'text-red-500', width: '33%', bg: 'bg-red-500' };
-    if (password.length < 12) return { label: 'Good', color: 'text-yellow-500', width: '66%', bg: 'bg-yellow-500' };
-    return { label: 'Strong', color: 'text-green-500', width: '100%', bg: 'bg-green-500' };
-  };
-
-  const strength = passwordStrength();
-  const passwordsMatch = confirmPassword && password === confirmPassword;
-
   return (
-    <div className="min-h-screen bg-background flex relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-20 left-20 w-64 h-64 bg-primary/30 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-20 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse delay-1000" />
+    <div className="min-h-screen flex">
+      {/* Left Panel - Visual */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-12 flex-col justify-between relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10"></div>
+        
+        <div className="relative z-10">
+          <Link href="/" className="flex items-center space-x-3 group">
+            <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform border border-white/20">
+              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <span className="text-2xl font-bold text-white">Prism</span>
+          </Link>
+        </div>
+
+        <div className="relative z-10 space-y-6">
+          <h1 className="text-5xl font-bold text-white leading-tight">
+            Start Your Financial Journey
+          </h1>
+          <p className="text-xl text-blue-100">
+            Break down complex finances into clear, actionable insights. Track spending, set budgets, and achieve your financial goals.
+          </p>
+          
+          <div className="grid grid-cols-2 gap-4 pt-8">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+              <div className="text-3xl font-bold text-white mb-1">Smart</div>
+              <div className="text-blue-100">Auto-categorization</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+              <div className="text-3xl font-bold text-white mb-1">Visual</div>
+              <div className="text-blue-100">Rich analytics</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10 text-blue-200 text-sm">
+          © 2024 Prism. Your finances, crystallized.
+        </div>
       </div>
 
-      {/* Left Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative z-10">
+      {/* Right Panel - Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md space-y-8">
-          {/* Logo & Back & Theme Toggle */}
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center space-x-2 group">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center group-hover:scale-110 transition-transform">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span className="text-lg font-bold text-foreground">Budgetly</span>
-            </Link>
-
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-3xl font-bold text-foreground mb-2">Create Account</h2>
+              <p className="text-muted-foreground">Join Prism and take control of your finances</p>
+            </div>
+            
             <button
               onClick={toggleTheme}
               className="p-2 rounded-lg border border-border hover:bg-accent transition-colors"
@@ -117,21 +151,7 @@ export default function RegisterPage() {
             </button>
           </div>
 
-          {/* Header */}
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Create your account</h1>
-            <p className="text-muted-foreground">Start tracking your finances today</p>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {error && (
-              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm">
-                {error}
-              </div>
-            )}
-
-            {/* Name Field */}
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="userName" className="block text-sm font-medium text-foreground mb-2">
                 Full Name
@@ -141,29 +161,27 @@ export default function RegisterPage() {
                 type="text"
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
-                required
+                className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-foreground placeholder-muted-foreground"
                 placeholder="John Doe"
-                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+                disabled={loading}
               />
             </div>
 
-            {/* Email Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-                Email
+                Email Address
               </label>
               <input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="john@example.com"
-                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+                className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-foreground placeholder-muted-foreground"
+                placeholder="you@example.com"
+                disabled={loading}
               />
             </div>
 
-            {/* Password Field */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
                 Password
@@ -174,9 +192,9 @@ export default function RegisterPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="At least 8 characters"
-                  className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow pr-10"
+                  className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-foreground placeholder-muted-foreground pr-12"
+                  placeholder="••••••••"
+                  disabled={loading}
                 />
                 <button
                   type="button"
@@ -195,32 +213,8 @@ export default function RegisterPage() {
                   )}
                 </button>
               </div>
-
-              {/* Password Strength */}
-              {strength && (
-                <div className="mt-2 space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Password strength:</span>
-                    <span className={strength.color + " font-medium"}>{strength.label}</span>
-                  </div>
-                  <div className="h-1.5 bg-border rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full ${strength.bg} transition-all duration-300`}
-                      style={{ width: strength.width }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Password Requirements */}
-              <div className="mt-2 text-xs text-muted-foreground space-y-1">
-                <p className={password.length >= 8 ? 'text-green-500' : ''}>
-                  ✓ At least 8 characters
-                </p>
-              </div>
             </div>
 
-            {/* Confirm Password Field */}
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-2">
                 Confirm Password
@@ -230,73 +224,35 @@ export default function RegisterPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                placeholder="Re-enter your password"
-                className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+                className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-foreground placeholder-muted-foreground"
+                placeholder="••••••••"
+                disabled={loading}
               />
-              
-              {/* Password Match Indicator */}
-              {confirmPassword && (
-                <p className={`mt-2 text-xs ${passwordsMatch ? 'text-green-500' : 'text-red-500'}`}>
-                  {passwordsMatch ? '✓ Passwords match' : '✗ Passwords do not match'}
-                </p>
-              )}
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading || !passwordsMatch}
-              className="w-full py-3 px-4 bg-primary text-white font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+              disabled={loading}
+              className="w-full py-3 px-4 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
-              {loading ? 'Creating account...' : 'Create account'}
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Creating account...</span>
+                </>
+              ) : (
+                <span>Create Account</span>
+              )}
             </button>
+          </form>
 
-            {/* Sign In Link */}
-            <div className="text-center text-sm">
-              <span className="text-muted-foreground">Already have an account? </span>
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              Already have an account?{' '}
               <Link href="/login" className="text-primary hover:underline font-medium">
                 Sign in
               </Link>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      {/* Right Side - Visual Panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/10 via-primary/5 to-background relative items-center justify-center p-12">
-        <div className="max-w-md space-y-8 relative z-10">
-          {/* Feature Cards */}
-          <div className="space-y-4">
-            <div className="bg-card/50 backdrop-blur border border-border rounded-2xl p-6 hover:shadow-lg transition-all">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">Track Every Dollar</h3>
-              <p className="text-sm text-muted-foreground">See where your money goes with intelligent categorization</p>
-            </div>
-
-            <div className="bg-card/50 backdrop-blur border border-border rounded-2xl p-6 hover:shadow-lg transition-all">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">Smart Insights</h3>
-              <p className="text-sm text-muted-foreground">Get personalized recommendations to save more</p>
-            </div>
-
-            <div className="bg-card/50 backdrop-blur border border-border rounded-2xl p-6 hover:shadow-lg transition-all">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">Secure & Private</h3>
-              <p className="text-sm text-muted-foreground">Your financial data is encrypted and protected</p>
-            </div>
+            </p>
           </div>
         </div>
       </div>
