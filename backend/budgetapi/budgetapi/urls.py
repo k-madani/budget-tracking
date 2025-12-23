@@ -16,8 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from accounts.views import register_view, login_view
-from transactions.views import transaction_detail, transactions
+from rest_framework_simplejwt.views import TokenRefreshView
+from accounts.views import register_view, login_view, reset_password_view
+from transactions.views import (
+    transaction_detail, transactions, transactions_summary,
+    categories, category_detail)
 
 
 urlpatterns = [
@@ -26,8 +29,15 @@ urlpatterns = [
     # Auth endpoints
     path("api/auth/register", register_view, name="register"),
     path("api/auth/login", login_view, name="login"),
+    path("api/auth/reset-password", reset_password_view, name="reset-password"),
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     # Transactions
     path("api/transactions", transactions, name="transactions"),
     path("api/transactions/<uuid:pk>", transaction_detail, name="transaction-detail"),
+    path("api/transactions/summary", transactions_summary, name="transactions-summary"),
+
+    # Categories
+    path("api/categories", categories, name="categories"),
+    path("api/categories/<uuid:pk>", category_detail, name="category-detail"),
 ]
