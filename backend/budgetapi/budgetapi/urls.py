@@ -21,7 +21,8 @@ from accounts.views import register_view, login_view, reset_password_view
 from transactions.views import (
     transaction_detail, transactions, transactions_summary,
     categories, category_detail)
-
+from gamification.views import (get_gamification_stats, get_all_achievements, 
+    mark_achievements_seen, get_new_achievements_count, get_leaderboard)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -40,4 +41,11 @@ urlpatterns = [
     # Categories
     path("api/categories", categories, name="categories"),
     path("api/categories/<uuid:pk>", category_detail, name="category-detail"),
+
+    # Gamification
+    path('api/stats', get_gamification_stats, name='gamification-stats'),
+    path('api/achievements', get_all_achievements, name='all-achievements'),
+    path('api/achievements/mark-seen', mark_achievements_seen, name='mark-achievements-seen'),
+    path('api/achievements/new-count', get_new_achievements_count, name='new-achievements-count'),
+    path('api/leaderboard', get_leaderboard, name='leaderboard'),
 ]
