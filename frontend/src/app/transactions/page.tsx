@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch } from 'react-redux';
-import Link from 'next/link';
 import api from '@/lib/api';
 import { clearAuth } from '@/lib/authSlice';
 import { toast } from 'react-hot-toast';
 import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/exportUtils';
 import Navbar from '@/components/Navbar';
+import TransactionModal from '@/components/TransactionModal';
+import Link from 'next/link';
 
 interface Transaction {
   id: string;
@@ -29,6 +30,18 @@ interface Category {
   type: 'INCOME' | 'EXPENSE';
 }
 
+interface Template {
+  id: string;
+  name: string;
+  amount: string;
+  currency: string;
+  note: string;
+  category: string;
+  category_name: string;
+  category_type: string;
+  is_favorite: boolean;
+}
+
 interface TransactionResponse {
   count: number;
   results: Transaction[];
@@ -39,6 +52,7 @@ export default function TransactionsPage() {
   const dispatch = useDispatch();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   
@@ -52,15 +66,6 @@ export default function TransactionsPage() {
   // Modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  // Form state
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [spentAt, setSpentAt] = useState(new Date().toISOString().split('T')[0]);
-  const [spentAtTime, setSpentAtTime] = useState('12:00');
-  const [currency, setCurrency] = useState('USD');
-  const [selectedCategory, setSelectedCategory] = useState('');
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   useEffect(() => {
@@ -86,13 +91,6 @@ export default function TransactionsPage() {
     }
   }, [dateFrom, dateTo]);
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
-  };
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -102,14 +100,16 @@ export default function TransactionsPage() {
       if (dateTo) params.append('to', dateTo);
       const queryString = params.toString();
 
-      const [transactionsRes, categoriesRes] = await Promise.all([
+      const [transactionsRes, categoriesRes, templatesRes] = await Promise.all([
         api.get(`/transactions${queryString ? '?' + queryString : ''}`),
-        api.get('/categories')
+        api.get('/categories'),
+        api.get('/templates').catch(() => ({ data: [] }))
       ]);
 
       const transactionData = transactionsRes.data as TransactionResponse;
       setTransactions(transactionData.results || []);
       setCategories(categoriesRes.data || []);
+      setTemplates(templatesRes.data || []);
     } catch (error: any) {
       console.error('Failed to fetch data:', error);
       toast.error('Failed to load transactions');
@@ -121,15 +121,17 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleLogout = () => {
+  const handleQuickAddFromTemplate = async (template: Template) => {
     try {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      dispatch(clearAuth());
-      toast.success('Logged out successfully');
-      router.push('/');
+      await api.post(`/templates/${template.id}/use`, {
+        spent_at: new Date().toISOString()
+      });
+
+      toast.success(`Added ${template.name}! 🎉`);
+      fetchData();
     } catch (error) {
-      toast.error('Failed to logout');
+      console.error('Failed to use template:', error);
+      toast.error('Failed to add transaction');
     }
   };
 
@@ -189,64 +191,6 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!amount || !spentAt) {
-      toast.error('Please fill in amount and date');
-      return;
-    }
-
-    const amountNum = parseFloat(amount);
-    if (amountNum <= 0) {
-      toast.error('Amount must be greater than 0');
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const spentAtISO = new Date(`${spentAt}T${spentAtTime}:00`).toISOString();
-      
-      const payload: any = {
-        amount: amountNum,
-        currency: currency.toUpperCase(),
-        note: note.trim(),
-        spent_at: spentAtISO,
-      };
-
-      if (selectedCategory) {
-        payload.category = selectedCategory;
-      }
-
-      if (editingTransaction) {
-        await api.put(`/transactions/${editingTransaction.id}`, payload);
-        toast.success('Transaction updated successfully');
-      } else {
-        await api.post('/transactions', payload);
-        toast.success('Transaction added successfully');
-      }
-
-      resetForm();
-      fetchData();
-    } catch (error: any) {
-      console.error('Failed to save transaction:', error);
-      const errorData = error.response?.data;
-      let errorMsg = 'Failed to save transaction';
-      
-      if (typeof errorData === 'object') {
-        const errors = Object.entries(errorData)
-          .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-          .join('; ');
-        errorMsg = errors;
-      }
-      
-      toast.error(errorMsg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const handleDelete = async (transactionId: string) => {
     if (!confirm('Are you sure you want to delete this transaction?')) return;
 
@@ -262,27 +206,7 @@ export default function TransactionsPage() {
 
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
-    setAmount(transaction.amount);
-    setNote(transaction.note || '');
-    
-    const spentDate = new Date(transaction.spent_at);
-    setSpentAt(spentDate.toISOString().split('T')[0]);
-    setSpentAtTime(spentDate.toTimeString().slice(0, 5));
-    
-    setCurrency(transaction.currency);
-    setSelectedCategory(transaction.category || '');
     setShowAddModal(true);
-  };
-
-  const resetForm = () => {
-    setAmount('');
-    setNote('');
-    setSpentAt(new Date().toISOString().split('T')[0]);
-    setSpentAtTime('12:00');
-    setCurrency('USD');
-    setSelectedCategory('');
-    setEditingTransaction(null);
-    setShowAddModal(false);
   };
 
   const filteredTransactions = transactions.filter(t => {
@@ -299,6 +223,10 @@ export default function TransactionsPage() {
   const totalExpenses = filteredTransactions
     .filter(t => t.category_type === 'EXPENSE')
     .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+  // Show favorite templates, or first 5 if no favorites
+  const favoriteTemplates = templates.filter(t => t.is_favorite);
+  const displayTemplates = favoriteTemplates.length > 0 ? favoriteTemplates : templates.slice(0, 5);
 
   if (loading) {
     return (
@@ -391,6 +319,67 @@ export default function TransactionsPage() {
             </button>
           </div>
         </div>
+
+        {/* Quick Templates - Horizontal Scroll Bar */}
+        {displayTemplates.length > 0 && (
+          <div className="bg-card border border-border rounded-xl p-5 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-foreground flex items-center space-x-2">
+                <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span>Quick Add</span>
+                {favoriteTemplates.length > 0 && (
+                  <span className="text-xs text-muted-foreground font-normal">({favoriteTemplates.length} favorites)</span>
+                )}
+              </h3>
+              <Link
+                href="/templates"
+                className="text-xs text-primary hover:underline font-medium"
+              >
+                Manage Templates →
+              </Link>
+            </div>
+
+            <div className="flex space-x-3 overflow-x-auto pb-2 scrollbar-hide">
+              {displayTemplates.map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => handleQuickAddFromTemplate(template)}
+                  className="group flex-shrink-0 w-52 bg-background hover:bg-primary/5 border-2 border-border hover:border-primary/50 rounded-xl p-4 transition-all hover:shadow-lg"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      {template.is_favorite && <span className="text-base">⭐</span>}
+                      <h4 className="font-bold text-foreground text-sm truncate group-hover:text-primary transition-colors">
+                        {template.name}
+                      </h4>
+                    </div>
+                    <div className={`ml-2 flex-shrink-0 px-2 py-0.5 rounded text-xs font-bold ${
+                      template.category_type === 'INCOME' 
+                        ? 'bg-green-500/10 text-green-600' 
+                        : 'bg-red-500/10 text-red-600'
+                    }`}>
+                      {template.category_type === 'INCOME' ? '+' : '-'}${parseFloat(template.amount).toFixed(2)}
+                    </div>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground mb-1 truncate">{template.category_name}</p>
+                  {template.note && (
+                    <p className="text-xs text-muted-foreground/70 mb-3 truncate italic">{template.note}</p>
+                  )}
+                  
+                  <div className="flex items-center justify-center space-x-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity pt-2 border-t border-border">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Add Now</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-card border border-border rounded-xl p-6">
@@ -605,135 +594,23 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-foreground">
-                {editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
-              </h2>
-              <button onClick={resetForm} className="p-2 rounded-lg hover:bg-muted transition-colors">
-                <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Amount <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                  placeholder="0.00"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Currency</label>
-                <input
-                  type="text"
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                  maxLength={3}
-                  placeholder="USD"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <p className="text-xs text-muted-foreground mt-1">3-letter currency code (e.g., USD, EUR)</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={spentAt}
-                    onChange={(e) => setSpentAt(e.target.value)}
-                    required
-                    className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Time</label>
-                  <input
-                    type="time"
-                    value={spentAtTime}
-                    onChange={(e) => setSpentAtTime(e.target.value)}
-                    className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Category <span className="text-xs text-muted-foreground">(Optional - Auto-categorizes if empty)</span>
-                </label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">Auto-categorize</option>
-                  <optgroup label="Income">
-                    {categories.filter(c => c.type === 'INCOME').map(category => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Expense">
-                    {categories.filter(c => c.type === 'EXPENSE').map(category => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Note</label>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  maxLength={255}
-                  rows={3}
-                  className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                  placeholder="Add a note about this transaction..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">{note.length}/255 characters</p>
-              </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  disabled={submitting}
-                  className="flex-1 py-2 px-4 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 py-2 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity font-semibold disabled:opacity-50"
-                >
-                  {submitting ? 'Saving...' : editingTransaction ? 'Update' : 'Add'} Transaction
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Transaction Modal */}
+      <TransactionModal
+        isOpen={showAddModal}
+        onClose={() => {
+          setShowAddModal(false);
+          setEditingTransaction(null);
+        }}
+        onSuccess={() => {
+          fetchData();
+          setEditingTransaction(null);
+        }}
+        categories={categories}
+        editingTransaction={editingTransaction}
+        showTimeField={true}
+        showCurrencyField={true}
+        title={editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
+      />
     </div>
   );
 }

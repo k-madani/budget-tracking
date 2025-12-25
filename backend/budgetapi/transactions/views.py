@@ -7,10 +7,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 
-from .models import Transaction, Category
+from .models import Transaction, Category, TransactionTemplate
 from .serializers import (
     TransactionWriteSerializer, TransactionReadSerializer,
-    CategorySerializer
+    CategorySerializer, TransactionTemplateSerializer
 )
 from .utils import auto_categorize_transaction, get_default_category
 
@@ -139,3 +139,74 @@ def category_detail(request, pk):
     # DELETE
     cat.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+# Add these imports at the top
+from .models import Transaction, Category, TransactionTemplate
+from .serializers import (
+    TransactionWriteSerializer, TransactionReadSerializer,
+    CategorySerializer, TransactionTemplateSerializer
+)
+
+# Add these views at the end
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def templates(request):
+    if request.method == "GET":
+        qs = TransactionTemplate.objects.filter(owner=request.user).order_by("-is_favorite", "name")
+        return Response(TransactionTemplateSerializer(qs, many=True).data)
+
+    # POST - Create template
+    ser = TransactionTemplateSerializer(data=request.data, context={"request": request})
+    if ser.is_valid():
+        ser.save(owner=request.user)
+        return Response(ser.data, status=status.HTTP_201_CREATED)
+    return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET", "PUT", "DELETE"])
+@permission_classes([IsAuthenticated])
+def template_detail(request, pk):
+    template = get_object_or_404(TransactionTemplate, pk=pk, owner=request.user)
+
+    if request.method == "GET":
+        return Response(TransactionTemplateSerializer(template).data)
+
+    if request.method == "PUT":
+        ser = TransactionTemplateSerializer(template, data=request.data, partial=True, context={"request": request})
+        if ser.is_valid():
+            ser.save()
+            return Response(ser.data)
+        return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # DELETE
+    template.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_from_template(request, pk):
+    """Create a transaction from a template"""
+    template = get_object_or_404(TransactionTemplate, pk=pk, owner=request.user)
+    
+    # Use current datetime or provided spent_at
+    spent_at = request.data.get("spent_at")
+    if not spent_at:
+        from django.utils import timezone
+        spent_at = timezone.now().isoformat()
+    
+    transaction_data = {
+        "amount": str(template.amount),
+        "currency": template.currency,
+        "note": template.note or "",
+        "spent_at": spent_at,
+        "category": str(template.category.id)
+    }
+    
+    ser = TransactionWriteSerializer(data=transaction_data, context={"request": request})
+    if ser.is_valid():
+        obj = ser.save(owner=request.user)
+        return Response(TransactionReadSerializer(obj).data, status=status.HTTP_201_CREATED)
+    
+    return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)

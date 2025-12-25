@@ -6,6 +6,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import Navbar from '@/components/Navbar';
+import TransactionModal from '@/components/TransactionModal';
 
 interface Transaction {
   id: string;
@@ -24,6 +25,18 @@ interface Category {
   type: 'INCOME' | 'EXPENSE';
   budget_limit?: number | null;
   current_spending?: number;
+}
+
+interface Template {
+  id: string;
+  name: string;
+  amount: string;
+  currency: string;
+  note: string;
+  category: string;
+  category_name: string;
+  category_type: string;
+  is_favorite: boolean;
 }
 
 interface StreakData {
@@ -45,9 +58,11 @@ export default function DashboardPage() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [streak, setStreak] = useState<StreakData | null>(null);
   const [level, setLevel] = useState<LevelData | null>(null);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
   const [balance, setBalance] = useState(0);
   const [income, setIncome] = useState(0);
@@ -63,16 +78,16 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, [router]);
 
-
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
 
-      const [summaryRes, transactionsRes, categoriesRes, gamificationRes] = await Promise.all([
+      const [summaryRes, transactionsRes, categoriesRes, gamificationRes, templatesRes] = await Promise.all([
         api.get('/transactions/summary'),
         api.get('/transactions'),
         api.get('/categories'),
-        api.get('/stats').catch(() => null)
+        api.get('/stats').catch(() => null),
+        api.get('/templates').catch(() => ({ data: [] }))
       ]);
 
       if (summaryRes.data) {
@@ -83,9 +98,10 @@ export default function DashboardPage() {
 
       const allTxns = transactionsRes.data.results || transactionsRes.data || [];
       setAllTransactions(allTxns);
-      setRecentTransactions(allTxns.slice(0, 3));
+      setRecentTransactions(allTxns.slice(0, 5));
 
       setCategories(categoriesRes.data || []);
+      setTemplates(templatesRes.data || []);
 
       if (gamificationRes?.data) {
         setStreak(gamificationRes.data.streak);
@@ -106,41 +122,18 @@ export default function DashboardPage() {
     }
   }; 
 
-  const getSmartInsights = () => {
-    const insights = [];
-    
-    if (streak && streak.current > 0) {
-      insights.push({
-        icon: '🔥',
-        text: `${streak.current}-day logging streak! Keep it up!`,
-        type: 'positive'
+  const handleQuickAddFromTemplate = async (template: Template) => {
+    try {
+      const response = await api.post(`/templates/${template.id}/use`, {
+        spent_at: new Date().toISOString()
       });
+
+      toast.success(`Added ${template.name}! 🎉`);
+      fetchDashboardData();
+    } catch (error) {
+      console.error('Failed to use template:', error);
+      toast.error('Failed to add transaction');
     }
-    
-    const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
-    if (savingsRate >= 20) {
-      insights.push({
-        icon: '💰',
-        text: `You're saving ${savingsRate.toFixed(0)}% of your income`,
-        type: 'positive'
-      });
-    } else if (savingsRate < 10 && income > 0) {
-      insights.push({
-        icon: '⚠️',
-        text: `Low savings rate: ${savingsRate.toFixed(0)}%. Consider reducing expenses`,
-        type: 'warning'
-      });
-    }
-    
-    if (level && level.points_to_next_level > 0) {
-      insights.push({
-        icon: '⭐',
-        text: `Level ${level.current} - ${level.points_to_next_level} points to next level`,
-        type: 'info'
-      });
-    }
-    
-    return insights.slice(0, 3);
   };
 
   const getWeeklySpending = () => {
@@ -191,16 +184,16 @@ export default function DashboardPage() {
         };
       })
       .sort((a, b) => b.percentage - a.percentage)
-      .slice(0, 2);
+      .slice(0, 3);
   };
 
-  const insights = getSmartInsights();
   const weeklySpending = getWeeklySpending();
   const budgetHealth = getBudgetHealth();
+  const favoriteTemplates = templates;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-[#FAFAFA] dark:bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">Loading dashboard...</p>
@@ -209,268 +202,271 @@ export default function DashboardPage() {
     );
   }
 
+  const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-background">
       <Navbar currentPage="dashboard" />
 
       <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-12">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-1">Dashboard</h1>
-            <p className="text-muted-foreground">Your financial overview</p>
+            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground mt-1">Your financial overview</p>
           </div>
-          <Link
-            href="/transactions"
-            className="inline-flex items-center space-x-2 px-6 py-3 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl transition-colors shadow-lg"
+          <button
+            onClick={() => setIsQuickAddOpen(true)}
+            className="px-6 py-3 bg-primary hover:bg-primary/90 text-white font-semibold rounded-lg transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>Add Transaction</span>
-          </Link>
+            + Add Transaction
+          </button>
         </div>
 
-        {/* Summary Cards with Effects */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg hover:border-primary/50 hover:-translate-y-1 transition-all duration-200 group">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
+        {/* Quick Actions - Favorite Templates */}
+        {favoriteTemplates.length > 0 && (
+          <div className="bg-gradient-to-br from-primary/5 via-transparent to-accent/5 border border-primary/20 rounded-xl p-6 mb-12">
+            <div className="flex items-center justify-between mb-4">
               <div>
-                <div className="text-2xl font-bold text-foreground">${balance.toFixed(2)}</div>
-                <div className="text-sm text-muted-foreground">Current Balance</div>
+                <h2 className="text-lg font-bold text-foreground flex items-center space-x-2">
+                  <span>⚡</span>
+                  <span>Quick Actions</span>
+                </h2>
+                <p className="text-sm text-muted-foreground">1-click recurring transactions</p>
               </div>
+              <Link href="/templates" className="text-sm text-primary hover:underline font-medium">
+                Manage Templates →
+              </Link>
             </div>
-          </div>
 
-          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg hover:border-green-500/50 hover:-translate-y-1 transition-all duration-200 group">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
-                <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-foreground">${income.toFixed(2)}</div>
-                <div className="text-sm text-muted-foreground">Total Income</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg hover:border-red-500/50 hover:-translate-y-1 transition-all duration-200 group">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-lg bg-red-500/10 flex items-center justify-center group-hover:bg-red-500/20 transition-colors">
-                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-foreground">${expenses.toFixed(2)}</div>
-                <div className="text-sm text-muted-foreground">Total Expenses</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Smart Insights with Effects */}
-        {insights.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-6 mb-8">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Smart Insights</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {insights.map((insight, index) => (
-                <div 
-                  key={index} 
-                  className="flex items-center space-x-3 p-4 bg-background rounded-lg border border-border hover:border-primary hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-default group"
+              {favoriteTemplates.map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => handleQuickAddFromTemplate(template)}
+                  className="group relative overflow-hidden bg-white dark:bg-card border-2 border-border hover:border-primary/50 rounded-xl p-5 transition-all hover:shadow-lg hover:scale-105"
                 >
-                  <span className="text-2xl group-hover:scale-110 transition-transform duration-200">{insight.icon}</span>
-                  <p className="text-sm text-foreground flex-1 font-medium">{insight.text}</p>
-                </div>
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-2xl">⭐</span>
+                      <div className="text-left">
+                        <h3 className="font-bold text-foreground group-hover:text-primary transition-colors">
+                          {template.name}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">{template.category_name}</p>
+                      </div>
+                    </div>
+                    <div className={`px-2 py-1 rounded text-xs font-medium ${
+                      template.category_type === 'INCOME' 
+                        ? 'bg-green-500/10 text-green-600'
+                        : 'bg-red-500/10 text-red-600'
+                    }`}>
+                      {template.category_type === 'INCOME' ? '+' : '-'}${parseFloat(template.amount).toFixed(2)}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{template.note || 'No note'}</span>
+                    <div className="flex items-center space-x-1 text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span className="font-medium">Add Now</span>
+                    </div>
+                  </div>
+
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
+                </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Spending & Budget */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* This Week's Spending with Effects */}
-          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-foreground">This Week's Spending</h2>
-              <Link href="/analytics" className="text-sm text-primary hover:underline font-medium">
-                Details
-              </Link>
-            </div>
-            
-            <div className="mb-6">
-              <div className="flex items-baseline space-x-3 mb-2">
-                <span className="text-4xl font-bold text-foreground">${weeklySpending.thisWeek.toFixed(2)}</span>
-                {weeklySpending.lastWeek > 0 && (
-                  <div className={`flex items-center space-x-1 px-3 py-1 rounded-full ${
-                    weeklySpending.change > 0 ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'
-                  }`}>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={
-                        weeklySpending.change > 0 ? "M5 10l7-7m0 0l7 7m-7-7v18" : "M19 14l-7 7m0 0l-7-7m7 7V3"
-                      } />
-                    </svg>
-                    <span className="text-sm font-bold">{Math.abs(weeklySpending.change).toFixed(0)}%</span>
-                  </div>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                vs ${weeklySpending.lastWeek.toFixed(2)} last week
-              </p>
-            </div>
+        {/* 1. SUMMARY - Hero Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="bg-white dark:bg-card rounded-xl p-6 border border-gray-200 dark:border-border">
+            <p className="text-sm text-muted-foreground mb-2">Current Balance</p>
+            <p className="text-4xl font-bold text-foreground">${balance.toFixed(2)}</p>
+          </div>
+          
+          <div className="bg-white dark:bg-card rounded-xl p-6 border border-gray-200 dark:border-border">
+            <p className="text-sm text-muted-foreground mb-2">Total Income</p>
+            <p className="text-4xl font-bold text-green-600 dark:text-green-500">${income.toFixed(2)}</p>
+          </div>
+          
+          <div className="bg-white dark:bg-card rounded-xl p-6 border border-gray-200 dark:border-border">
+            <p className="text-sm text-muted-foreground mb-2">Total Expenses</p>
+            <p className="text-4xl font-bold text-red-600 dark:text-red-500">${expenses.toFixed(2)}</p>
+          </div>
+        </div>
 
-            {/* Mini Chart with Tooltips */}
-            <div className="relative">
-              <div className="flex items-end justify-between gap-2 h-32 bg-background/50 rounded-lg p-3">
-                {weeklySpending.dailyData.map((value, index) => {
-                  const maxValue = Math.max(...weeklySpending.dailyData, 1);
-                  const height = maxValue > 0 ? (value / maxValue) * 100 : 0;
-                  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                  
-                  return (
-                    <div key={index} className="flex-1 flex flex-col items-center group relative h-full">
-                      <div className="w-full h-full flex items-end justify-center">
-                        {value > 0 ? (
-                          <div 
-                            className="w-full bg-primary rounded-t hover:bg-primary/80 transition-all duration-200 cursor-pointer relative"
-                            style={{ height: `${Math.max(height, 10)}%` }}
-                          >
-                            {/* Tooltip */}
-                            <div className="opacity-0 group-hover:opacity-100 absolute -top-14 left-1/2 -translate-x-1/2 bg-foreground text-background px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-opacity shadow-lg z-10">
-                              <div className="text-center mb-0.5">{days[index]}</div>
-                              <div className="text-center font-bold">${value.toFixed(2)}</div>
-                              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2 h-2 bg-foreground rotate-45" />
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-full h-2 bg-muted/30 rounded-full mb-1" />
-                        )}
+        {/* 2. STREAK SECTION */}
+        {(streak && streak.current > 0) || (level && level.current > 0) ? (
+          <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-xl p-8 mb-12 border border-primary/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-8">
+                {streak && streak.current > 0 && (
+                  <Link href="/progress" className="group">
+                    <div className="flex items-center space-x-3">
+                      <div className="text-4xl">🔥</div>
+                      <div>
+                        <p className="text-3xl font-bold text-foreground group-hover:text-primary transition-colors">
+                          {streak.current} days
+                        </p>
+                        <p className="text-sm text-muted-foreground">Logging streak</p>
                       </div>
                     </div>
-                  );
-                })}
+                  </Link>
+                )}
+                
+                {savingsRate >= 20 && (
+                  <Link href="/progress" className="group">
+                    <div className="flex items-center space-x-3 pl-8 border-l border-gray-300 dark:border-border">
+                      <div className="text-4xl">💰</div>
+                      <div>
+                        <p className="text-3xl font-bold text-green-600 dark:text-green-500 group-hover:text-green-700 dark:group-hover:text-green-400 transition-colors">
+                          {savingsRate.toFixed(0)}%
+                        </p>
+                        <p className="text-sm text-muted-foreground">Savings rate</p>
+                      </div>
+                    </div>
+                  </Link>
+                )}
+
+                {level && level.current > 0 && (
+                  <Link href="/progress" className="group">
+                    <div className="flex items-center space-x-3 pl-8 border-l border-gray-300 dark:border-border">
+                      <div className="text-4xl">⭐</div>
+                      <div>
+                        <p className="text-3xl font-bold text-foreground group-hover:text-primary transition-colors">
+                          Level {level.current}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{level.points_to_next_level} pts to next</p>
+                      </div>
+                    </div>
+                  </Link>
+                )}
               </div>
-              <div className="flex justify-between text-xs text-muted-foreground mt-3 px-3">
-                <span>M</span>
-                <span>T</span>
-                <span>W</span>
-                <span>T</span>
-                <span>F</span>
-                <span>S</span>
-                <span>S</span>
+              
+              <Link 
+                href="/progress"
+                className="text-primary hover:text-primary/80 font-medium text-sm transition-colors flex items-center space-x-1"
+              >
+                <span>View Progress</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* 3. ANALYTICS & BUDGET HEALTH */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+          {/* This Week's Spending */}
+          <div className="bg-white dark:bg-card rounded-xl p-6 border border-gray-200 dark:border-border">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-foreground">This Week's Spending</h2>
+              <Link href="/analytics" className="text-sm text-primary hover:underline">
+                Details →
+              </Link>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-baseline space-x-3 mb-2">
+                <span className="text-4xl font-bold text-foreground">
+                  ${weeklySpending.thisWeek.toFixed(2)}
+                </span>
+                {weeklySpending.lastWeek > 0 && (
+                  <span className={`text-sm font-semibold px-2 py-1 rounded ${
+                    weeklySpending.change > 0 
+                      ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400' 
+                      : 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400'
+                  }`}>
+                    {weeklySpending.change > 0 ? '↑' : '↓'} {Math.abs(weeklySpending.change).toFixed(0)}%
+                  </span>
+                )}
               </div>
+              <p className="text-sm text-muted-foreground">vs ${weeklySpending.lastWeek.toFixed(2)} last week</p>
+            </div>
+
+            <div className="h-32 flex items-end space-x-2">
+              {weeklySpending.dailyData.map((value, index) => {
+                const maxValue = Math.max(...weeklySpending.dailyData, 1);
+                const height = maxValue > 0 ? (value / maxValue) * 100 : 0;
+                const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                
+                return (
+                  <div key={index} className="flex-1 flex flex-col items-center">
+                    <div className="w-full relative group">
+                      {value > 0 ? (
+                        <>
+                          <div 
+                            className="w-full bg-primary rounded-t hover:bg-primary/80 transition-colors cursor-pointer"
+                            style={{ height: `${Math.max(height * 1.2, 8)}px` }}
+                          />
+                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs px-2 py-1 rounded whitespace-nowrap transition-opacity">
+                            ${value.toFixed(0)}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="w-full h-1 bg-gray-200 dark:bg-muted rounded" />
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground mt-2">{days[index]}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Budget Health with Enhanced Effects */}
-          <div className="bg-card border border-border rounded-xl p-6 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center justify-between mb-4">
+          {/* Budget Health */}
+          <div className="bg-white dark:bg-card rounded-xl p-6 border border-gray-200 dark:border-border">
+            <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-foreground">Budget Health</h2>
-              <Link href="/categories" className="text-sm text-primary hover:underline font-medium">
-                Manage
+              <Link href="/categories" className="text-sm text-primary hover:underline">
+                Manage →
               </Link>
             </div>
 
             {budgetHealth.length === 0 ? (
-              <div className="text-center py-12">
-                <svg className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <p className="text-sm text-muted-foreground mb-2">No budget limits set</p>
-                <Link href="/categories" className="text-sm text-primary hover:underline">
-                  Set budget limits
+              <div className="text-center py-8">
+                <p className="text-muted-foreground text-sm mb-3">No budget limits set</p>
+                <Link href="/categories" className="text-primary text-sm hover:underline">
+                  Set budget limits →
                 </Link>
               </div>
             ) : (
               <div className="space-y-6">
                 {budgetHealth.map((item, index) => (
-                  <div 
-                    key={index} 
-                    className="p-4 bg-background rounded-lg border border-border hover:border-primary/50 hover:shadow-md transition-all duration-200 group"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200 ${
-                          item.status === 'over' 
-                            ? 'bg-red-500/10'
-                            : item.status === 'warning'
-                            ? 'bg-yellow-500/10'
-                            : 'bg-green-500/10'
-                        }`}>
-                          <svg className={`w-5 h-5 ${
-                            item.status === 'over' 
-                              ? 'text-red-500'
-                              : item.status === 'warning'
-                              ? 'text-yellow-500'
-                              : 'text-green-500'
-                          }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-foreground">{item.name}</h3>
-                          <p className="text-xs text-muted-foreground">
-                            ${item.spent.toFixed(2)} of ${item.budget.toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className={`px-3 py-1.5 rounded-full text-sm font-bold ${
+                  <div key={index}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-foreground">{item.name}</span>
+                      <span className={`font-bold ${
                         item.status === 'over' 
-                          ? 'bg-red-500/10 text-red-500'
+                          ? 'text-red-600 dark:text-red-400'
                           : item.status === 'warning'
-                          ? 'bg-yellow-500/10 text-yellow-500'
-                          : 'bg-green-500/10 text-green-500'
+                          ? 'text-yellow-600 dark:text-yellow-400'
+                          : 'text-green-600 dark:text-green-400'
                       }`}>
                         {item.percentage.toFixed(0)}%
-                      </div>
+                      </span>
                     </div>
-                    
-                    <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+                    <div className="w-full bg-gray-200 dark:bg-muted rounded-full h-2 overflow-hidden">
                       <div
-                        className={`h-full transition-all duration-700 ease-out ${
+                        className={`h-full transition-all duration-500 ${
                           item.status === 'over' 
-                            ? 'bg-red-500'
+                            ? 'bg-red-600 dark:bg-red-500'
                             : item.status === 'warning'
-                            ? 'bg-yellow-500'
-                            : 'bg-green-500'
+                            ? 'bg-yellow-500 dark:bg-yellow-400'
+                            : 'bg-green-600 dark:bg-green-500'
                         }`}
                         style={{ width: `${Math.min(item.percentage, 100)}%` }}
                       />
                     </div>
-                    
-                    {item.status === 'over' && (
-                      <div className="flex items-center space-x-1 text-red-500 mt-2 animate-pulse">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        <p className="text-xs font-semibold">
-                          Over budget by ${(item.spent - item.budget).toFixed(2)}
-                        </p>
-                      </div>
-                    )}
-                    {item.status === 'warning' && (
-                      <p className="text-xs text-yellow-500 mt-2 flex items-center font-medium">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        ${(item.budget - item.spent).toFixed(2)} remaining
-                      </p>
-                    )}
-                    {item.status === 'good' && (
-                      <p className="text-xs text-green-500 mt-2 flex items-center font-medium">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        On track - ${(item.budget - item.spent).toFixed(2)} left
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ${item.spent.toFixed(2)} of ${item.budget.toFixed(2)}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -478,72 +474,80 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Transactions with Effects */}
-        <div className="bg-card border border-border rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-foreground">Recent Activity</h2>
-            <Link 
-              href="/transactions"
-              className="text-sm text-primary hover:underline font-medium"
-            >
-              View all
-            </Link>
+        {/* 4. RECENT TRANSACTIONS */}
+        <div className="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border">
+          <div className="p-6 border-b border-gray-200 dark:border-border">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-foreground">Recent Transactions</h2>
+              <Link href="/transactions" className="text-sm text-primary hover:underline">
+                View all →
+              </Link>
+            </div>
           </div>
 
           {recentTransactions.length === 0 ? (
-            <div className="text-center py-12">
-              <svg className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <p className="text-muted-foreground mb-4">No transactions yet</p>
-              <Link 
-                href="/transactions"
-                className="text-sm text-primary hover:underline font-medium"
+            <div className="p-12 text-center">
+              <p className="text-muted-foreground mb-3">No transactions yet</p>
+              <button
+                onClick={() => setIsQuickAddOpen(true)}
+                className="text-primary text-sm hover:underline"
               >
                 Add your first transaction
-              </Link>
+              </button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-gray-200 dark:divide-border">
               {recentTransactions.map((transaction) => (
                 <div 
                   key={transaction.id} 
-                  className="flex items-center justify-between p-4 bg-background rounded-lg hover:bg-muted/50 hover:shadow-md hover:scale-[1.01] transition-all duration-200 group"
+                  className="p-4 hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors flex items-center justify-between"
                 >
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200 ${
-                      transaction.category_type === 'INCOME' ? 'bg-green-500/10' : 'bg-red-500/10'
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      transaction.category_type === 'INCOME' 
+                        ? 'bg-green-100 dark:bg-green-500/20' 
+                        : 'bg-red-100 dark:bg-red-500/20'
                     }`}>
-                      <svg className={`w-5 h-5 ${
-                        transaction.category_type === 'INCOME' ? 'text-green-500' : 'text-red-500'
-                      }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={
-                          transaction.category_type === 'INCOME' 
-                            ? "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                            : "M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"
-                        } />
-                      </svg>
+                      <div className={`w-2 h-2 rounded-full ${
+                        transaction.category_type === 'INCOME' ? 'bg-green-600' : 'bg-red-600'
+                      }`} />
                     </div>
                     <div>
-                      <p className="font-medium text-foreground text-sm">
+                      <p className="font-medium text-foreground">
                         {transaction.category_name || 'Uncategorized'}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(transaction.spent_at).toLocaleDateString()}
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(transaction.spent_at).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric'
+                        })}
                       </p>
                     </div>
                   </div>
-                  <div className={`text-lg font-semibold ${
-                    transaction.category_type === 'INCOME' ? 'text-green-500' : 'text-red-500'
+                  <span className={`font-bold text-lg ${
+                    transaction.category_type === 'INCOME' 
+                      ? 'text-green-600 dark:text-green-500' 
+                      : 'text-red-600 dark:text-red-500'
                   }`}>
                     {transaction.category_type === 'INCOME' ? '+' : '-'}${parseFloat(transaction.amount).toFixed(2)}
-                  </div>
+                  </span>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Transaction Modal */}
+      <TransactionModal
+        isOpen={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+        onSuccess={fetchDashboardData}
+        categories={categories}
+        showTimeField={false}
+        showCurrencyField={false}
+        title="Quick Add"
+      />
     </div>
   );
 }

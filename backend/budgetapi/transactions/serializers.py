@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db import models as django_models
-from .models import Transaction, Category
+from .models import Transaction, Category, TransactionTemplate
 
 class TransactionWriteSerializer(serializers.ModelSerializer):
     # Make category optional
@@ -65,3 +65,23 @@ class CategorySerializer(serializers.ModelSerializer):
         ).aggregate(total=django_models.Sum('amount'))['total'] or 0
         
         return float(spending)
+class TransactionTemplateSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    category_type = serializers.CharField(source="category.type", read_only=True)
+    
+    class Meta:
+        model = TransactionTemplate
+        fields = ("id", "name", "amount", "currency", "note", "category", 
+                  "category_name", "category_type", "is_favorite", "created_at")
+        read_only_fields = ("id", "created_at", "category_name", "category_type")
+    
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Amount must be positive.")
+        return value
+    
+    def validate_category(self, value):
+        request = self.context.get("request")
+        if value.owner_id != request.user.id:
+            raise serializers.ValidationError("Invalid category.")
+        return value
