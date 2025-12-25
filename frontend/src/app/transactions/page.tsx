@@ -65,6 +65,7 @@ export default function TransactionsPage() {
 
   // Modal state
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
@@ -209,6 +210,14 @@ export default function TransactionsPage() {
     setShowAddModal(true);
   };
 
+  const clearAllFilters = () => {
+    setFilterType('all');
+    setFilterCategory('all');
+    setSearchQuery('');
+    setDateFrom('');
+    setDateTo('');
+  };
+
   const filteredTransactions = transactions.filter(t => {
     const matchesType = filterType === 'all' || t.category_type === filterType;
     const matchesCategory = filterCategory === 'all' || t.category === filterCategory;
@@ -224,9 +233,9 @@ export default function TransactionsPage() {
     .filter(t => t.category_type === 'EXPENSE')
     .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
-  // Show favorite templates, or first 5 if no favorites
   const favoriteTemplates = templates.filter(t => t.is_favorite);
   const displayTemplates = favoriteTemplates.length > 0 ? favoriteTemplates : templates.slice(0, 5);
+  const hasActiveFilters = filterType !== 'all' || filterCategory !== 'all' || searchQuery || dateFrom || dateTo;
 
   if (loading) {
     return (
@@ -251,6 +260,23 @@ export default function TransactionsPage() {
           </div>
 
           <div className="flex items-center space-x-3">
+            {/* Filter Button */}
+            <button
+              onClick={() => setShowFilterModal(true)}
+              className={`relative px-4 py-2 bg-background border-2 ${
+                hasActiveFilters ? 'border-primary' : 'border-border'
+              } text-foreground font-medium rounded-lg hover:bg-muted transition-colors flex items-center space-x-2`}
+            >
+              <svg className={`w-4 h-4 ${hasActiveFilters ? 'text-primary' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              <span>Filter</span>
+              {hasActiveFilters && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full" />
+              )}
+            </button>
+
+            {/* Export Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
@@ -381,6 +407,49 @@ export default function TransactionsPage() {
           </div>
         )}
 
+        {/* Active Filters Indicator */}
+        {hasActiveFilters && (
+          <div className="mb-6 flex items-center justify-between bg-primary/10 border border-primary/20 rounded-lg px-4 py-3">
+            <div className="flex items-center space-x-2 flex-wrap gap-2">
+              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              <span className="text-sm font-medium text-foreground">Active filters:</span>
+              {filterType !== 'all' && (
+                <span className="px-2 py-0.5 bg-primary/20 text-primary text-xs rounded-full font-medium">
+                  {filterType}
+                </span>
+              )}
+              {filterCategory !== 'all' && (
+                <span className="px-2 py-0.5 bg-primary/20 text-primary text-xs rounded-full font-medium">
+                  {categories.find(c => c.id === filterCategory)?.name}
+                </span>
+              )}
+              {searchQuery && (
+                <span className="px-2 py-0.5 bg-primary/20 text-primary text-xs rounded-full font-medium">
+                  "{searchQuery}"
+                </span>
+              )}
+              {dateFrom && (
+                <span className="px-2 py-0.5 bg-primary/20 text-primary text-xs rounded-full font-medium">
+                  From: {new Date(dateFrom).toLocaleDateString()}
+                </span>
+              )}
+              {dateTo && (
+                <span className="px-2 py-0.5 bg-primary/20 text-primary text-xs rounded-full font-medium">
+                  To: {new Date(dateTo).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={clearAllFilters}
+              className="text-sm text-primary hover:underline font-medium whitespace-nowrap"
+            >
+              Clear All
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-card border border-border rounded-xl p-6">
             <div className="flex items-center space-x-3">
@@ -425,88 +494,6 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-6 mb-8">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Filters</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Type</label>
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value as any)}
-                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="all">All Types</option>
-                <option value="INCOME">Income</option>
-                <option value="EXPENSE">Expense</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Category</label>
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="all">All Categories</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name} ({cat.type})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">From Date</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">To Date</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Search</label>
-              <input
-                type="text"
-                placeholder="Search notes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-          </div>
-
-          {(dateFrom || dateTo || filterType !== 'all' || filterCategory !== 'all' || searchQuery) && (
-            <div className="mt-4">
-              <button
-                onClick={() => {
-                  setDateFrom('');
-                  setDateTo('');
-                  setFilterType('all');
-                  setFilterCategory('all');
-                  setSearchQuery('');
-                }}
-                className="text-sm text-primary hover:underline"
-              >
-                Clear all filters
-              </button>
-            </div>
-          )}
-        </div>
-
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           {filteredTransactions.length === 0 ? (
             <div className="text-center py-12">
@@ -514,7 +501,9 @@ export default function TransactionsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <p className="text-muted-foreground">No transactions found</p>
-              <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters or add a new transaction</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {hasActiveFilters ? 'Try adjusting your filters' : 'Add a new transaction to get started'}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -593,6 +582,106 @@ export default function TransactionsPage() {
           )}
         </div>
       </div>
+
+      {/* Filter Modal */}
+      {showFilterModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-foreground">Filter Transactions</h2>
+              <button onClick={() => setShowFilterModal(false)} className="p-2 rounded-lg hover:bg-muted transition-colors">
+                <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              {/* Type Filter */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Type</label>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value as any)}
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="all">All Types</option>
+                  <option value="INCOME">Income</option>
+                  <option value="EXPENSE">Expense</option>
+                </select>
+              </div>
+
+              {/* Category Filter */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Category</label>
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name} ({cat.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date Range */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">From Date</label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">To Date</label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Search */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Search</label>
+                <input
+                  type="text"
+                  placeholder="Search in notes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="flex-1 py-2.5 px-4 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
+                >
+                  Clear All
+                </button>
+                <button
+                  onClick={() => setShowFilterModal(false)}
+                  className="flex-1 py-2.5 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity font-semibold"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transaction Modal */}
       <TransactionModal
