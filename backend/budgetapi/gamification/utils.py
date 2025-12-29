@@ -60,11 +60,11 @@ def check_achievements(user):
             
             # Add points to user stats
             stats.total_points += achievement.points
-            stats.level = stats.calculate_level()
+            # DELETE: stats.level = stats.calculate_level()
             stats.save()
             
             newly_unlocked.append(achievement)
-    
+
     return newly_unlocked
 
 def get_user_categories_count(user):

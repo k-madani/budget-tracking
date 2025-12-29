@@ -96,6 +96,16 @@ export default function Navbar({ currentPage }: NavbarProps) {
               Analytics
             </Link>
             <Link 
+              href="/gamification" 
+              className={`text-sm font-medium ${
+                currentPage === 'gamification'
+                  ? 'text-primary border-b-2 border-primary pb-0.5'
+                  : 'text-muted-foreground hover:text-foreground transition-colors'
+              }`}
+            >
+              Progress
+            </Link>
+            <Link 
               href="/profile" 
               className={`text-sm font-medium ${
                 currentPage === 'profile'

@@ -44,15 +44,13 @@ def transactions(request):
     note = request.data.get("note", "")
     category_id = request.data.get("category")
     
-    # If no category provided, try auto-categorization
+    # Auto-categorization logic (existing code)
     if not category_id and note:
         suggested_category = auto_categorize_transaction(note, request.user)
         if suggested_category:
             request.data['category'] = str(suggested_category.id)
     
-    # If still no category, detect if income or expense and use appropriate default
     if not request.data.get('category'):
-        # Check if note contains income keywords
         note_lower = note.lower()
         income_keywords = ["salary", "income", "paycheck", "wages", "freelance", "bonus", "payment received"]
         
@@ -65,10 +63,24 @@ def transactions(request):
     ser = TransactionWriteSerializer(data=request.data, context={"request": request})
     if ser.is_valid():
         obj = ser.save(owner=request.user)
-        return Response(TransactionReadSerializer(obj).data, status=status.HTTP_201_CREATED)
-    
-    return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        
+        # ✅ CHECK FOR NEW ACHIEVEMENTS
+        from gamification.models import UserAchievement
+        newly_unlocked = UserAchievement.objects.filter(
+            user=request.user, 
+            is_new=True
+        ).select_related('achievement')
+        
+        response_data = TransactionReadSerializer(obj).data
+        response_data['newly_unlocked_achievements'] = [{
+            'id': ua.achievement.id,
+            'name': ua.achievement.name,
+            'description': ua.achievement.description,
+            'icon': ua.achievement.icon,
+            'points': ua.achievement.points,
+        } for ua in newly_unlocked]
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
 @api_view(["GET", "PUT", "DELETE"])
 @permission_classes([IsAuthenticated])

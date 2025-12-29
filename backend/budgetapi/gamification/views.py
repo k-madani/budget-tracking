@@ -9,7 +9,7 @@ from .models import UserStats, Achievement, UserAchievement
 @permission_classes([IsAuthenticated])
 def get_gamification_stats(request):
     """
-    Get user's complete gamification statistics
+    Get user's achievement statistics
     """
     user = request.user
     
@@ -31,20 +31,8 @@ def get_gamification_stats(request):
         'is_new': ua.is_new
     } for ua in unlocked_achievements]
     
-    # Calculate progress to next level
-    current_level_points = (stats.level - 1) * 100
-    next_level_points = stats.level * 100
-    points_in_current_level = stats.total_points - current_level_points
-    points_to_next_level = next_level_points - stats.total_points
-    
     return Response({
-        'level': {
-            'current': stats.level,
-            'total_points': stats.total_points,
-            'points_in_current_level': points_in_current_level,
-            'points_to_next_level': points_to_next_level,
-            'progress_percentage': (points_in_current_level / 100) * 100 if stats.level > 0 else 0
-        },
+        'total_points': stats.total_points,
         'achievements': {
             'unlocked': unlocked_list,
             'unlocked_count': len(unlocked_list),
@@ -56,7 +44,6 @@ def get_gamification_stats(request):
             'days_active': stats.days_active
         }
     })
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

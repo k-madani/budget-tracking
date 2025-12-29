@@ -60,7 +60,6 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
-  const [streak, setStreak] = useState<StreakData | null>(null);
   const [level, setLevel] = useState<LevelData | null>(null);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
@@ -104,7 +103,6 @@ export default function DashboardPage() {
       setTemplates(templatesRes.data || []);
 
       if (gamificationRes?.data) {
-        setStreak(gamificationRes.data.streak);
         setLevel(gamificationRes.data.level);
       }
 

@@ -3,7 +3,6 @@ from django.contrib.auth.models import User
 class Achievement(models.Model):
     """Define available achievements"""
     ACHIEVEMENT_TYPES = [
-        ('streak', 'Streak'),
         ('transaction', 'Transaction Count'),
         ('budget', 'Budget Related'),
         ('savings', 'Savings Related'),
@@ -44,47 +43,14 @@ class UserStats(models.Model):
     """Track overall user statistics"""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='stats')
     total_points = models.IntegerField(default=0)
-    level = models.IntegerField(default=1)
+
     total_categories_used = models.IntegerField(default=0)
     days_active = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.user.username} - Level {self.level}"
-
-    def calculate_level(self):
-        """
-        Calculate level based on total points with realistic progression
-        Level 1: 0-49 points (easy start - 7 day streak gets you here)
-        Level 2: 50-149 points (2 weeks of activity)
-        Level 3: 150-299 points (1 month of activity)
-        Then increases by 200 points per level
-        """
-        if self.total_points < 50:
-            return 1
-        elif self.total_points < 150:
-            return 2
-        elif self.total_points < 300:
-            return 3
-        else:
-            # After level 3, need 200 points per level
-            return 3 + ((self.total_points - 300) // 200)
-    
-    def points_to_next_level(self):
-        """Calculate points needed for next level"""
-        current_level = self.calculate_level()
-        
-        if current_level == 1:
-            return 50 - self.total_points
-        elif current_level == 2:
-            return 150 - self.total_points
-        elif current_level == 3:
-            return 300 - self.total_points
-        else:
-            # For levels 4+, calculate next milestone
-            next_milestone = 300 + (current_level - 3) * 200
-            return next_milestone - self.total_points
+        return f"{self.user.username} - {self.total_points} points"
 
     class Meta:
         db_table = 'user_stats'
