@@ -37,3 +37,23 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f"{self.owner.username} {self.amount} {self.currency} on {self.spent_at:%Y-%m-%d}"
+
+class TransactionTemplate(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="templates")
+    name = models.CharField(max_length=100, help_text="Template name (e.g., 'Monthly Rent')")
+    category = models.ForeignKey('Category', on_delete=models.PROTECT, related_name="templates")
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default="USD")
+    note = models.CharField(max_length=255, blank=True, null=True)
+    is_favorite = models.BooleanField(default=False)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-is_favorite", "name")
+        unique_together = ("owner", "name")
+
+    def __str__(self):
+        return f"{self.owner.username} - {self.name} (${self.amount})"
