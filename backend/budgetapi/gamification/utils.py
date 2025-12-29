@@ -1,64 +1,7 @@
 from django.utils import timezone
-from datetime import timedelta, date
-from .models import UserStreak, UserStats, Achievement, UserAchievement
-
-def update_user_streak(user, transaction_date=None):
-    """
-    Update user's streak based on transaction activity
-    Should be called whenever a user logs a transaction
-    
-    Args:
-        user: The user object
-        transaction_date: The date the transaction was spent (not created).
-                         If None, uses today's date.
-    """
-    streak, created = UserStreak.objects.get_or_create(user=user)
-    
-    # Use the transaction's spent_at date, not creation date
-    # This allows backdated transactions to count for streak
-    if transaction_date is None:
-        today = timezone.now().date()
-    else:
-        today = transaction_date
-    
-    # If first transaction ever
-    if not streak.last_activity_date:
-        streak.current_streak = 1
-        streak.longest_streak = 1
-        streak.last_activity_date = today
-        streak.total_transactions = 1
-        streak.save()
-        check_achievements(user)
-        return streak
-    
-    # If already logged today, just increment transaction count
-    if streak.last_activity_date == today:
-        streak.total_transactions += 1
-        streak.save()
-        check_achievements(user)
-        return streak
-    
-    # Calculate days since last activity
-    yesterday = today - timedelta(days=1)
-    
-    if streak.last_activity_date == yesterday:
-        # Consecutive day - increment streak
-        streak.current_streak += 1
-        if streak.current_streak > streak.longest_streak:
-            streak.longest_streak = streak.current_streak
-    elif streak.last_activity_date < yesterday:
-        # Streak broken - reset to 1
-        streak.current_streak = 1
-    
-    streak.last_activity_date = today
-    streak.total_transactions += 1
-    streak.save()
-    
-    # Check for new achievements
-    check_achievements(user)
-    
-    return streak
-
+from datetime import timedelta
+from .models import UserStats, Achievement, UserAchievement
+from transactions.models import Transaction, Category
 
 def check_achievements(user):
     """
@@ -67,11 +10,8 @@ def check_achievements(user):
     """
     newly_unlocked = []
     
-    try:
-        streak = UserStreak.objects.get(user=user)
-        stats, _ = UserStats.objects.get_or_create(user=user)
-    except UserStreak.DoesNotExist:
-        return newly_unlocked
+    # Get or create user stats (no more UserStreak needed)
+    stats, _ = UserStats.objects.get_or_create(user=user)
     
     # Get all achievements
     all_achievements = Achievement.objects.all()
@@ -86,14 +26,10 @@ def check_achievements(user):
         
         unlocked = False
         
-        # Check streak achievements
-        if achievement.achievement_type == 'streak':
-            if streak.current_streak >= achievement.requirement_value:
-                unlocked = True
-        
         # Check transaction count achievements
-        elif achievement.achievement_type == 'transaction':
-            if streak.total_transactions >= achievement.requirement_value:
+        if achievement.achievement_type == 'transaction':
+            total_transactions = Transaction.objects.filter(owner=user).count()
+            if total_transactions >= achievement.requirement_value:
                 unlocked = True
         
         # Check category achievements
@@ -102,13 +38,13 @@ def check_achievements(user):
             if categories_count >= achievement.requirement_value:
                 unlocked = True
         
-        # Check savings achievements - based on your actual model fields
+        # Check savings achievements
         elif achievement.achievement_type == 'savings':
             monthly_savings = calculate_monthly_savings(user)
             if monthly_savings >= achievement.requirement_value:
                 unlocked = True
         
-        # Check budget achievements - placeholder
+        # Check budget achievements
         elif achievement.achievement_type == 'budget':
             weeks_under_budget = calculate_weeks_under_budget(user)
             if weeks_under_budget >= achievement.requirement_value:
@@ -130,7 +66,6 @@ def check_achievements(user):
             newly_unlocked.append(achievement)
     
     return newly_unlocked
-
 
 def get_user_categories_count(user):
     """Get number of unique categories user has used"""
@@ -221,52 +156,3 @@ def calculate_weeks_under_budget(user):
             break  # Stop counting if a week is over budget
     
     return weeks_under
-
-
-def get_streak_status(user):
-    """Get user's current streak status"""
-    try:
-        streak = UserStreak.objects.get(user=user)
-        today = timezone.now().date()
-        
-        # Check if streak is still valid
-        if streak.last_activity_date:
-            days_since_activity = (today - streak.last_activity_date).days
-            
-            if days_since_activity > 1:
-                # Streak is broken but not yet updated
-                return {
-                    'current_streak': 0,
-                    'longest_streak': streak.longest_streak,
-                    'status': 'broken',
-                    'message': 'Your streak was broken. Start a new one today!'
-                }
-            elif days_since_activity == 1:
-                return {
-                    'current_streak': streak.current_streak,
-                    'longest_streak': streak.longest_streak,
-                    'status': 'at_risk',
-                    'message': 'Log a transaction today to continue your streak!'
-                }
-            else:  # days_since_activity == 0
-                return {
-                    'current_streak': streak.current_streak,
-                    'longest_streak': streak.longest_streak,
-                    'status': 'active',
-                    'message': f'Great! {streak.current_streak}-day streak active!'
-                }
-        
-        return {
-            'current_streak': 0,
-            'longest_streak': 0,
-            'status': 'new',
-            'message': 'Log your first transaction to start a streak!'
-        }
-    
-    except UserStreak.DoesNotExist:
-        return {
-            'current_streak': 0,
-            'longest_streak': 0,
-            'status': 'new',
-            'message': 'Log your first transaction to start a streak!'
-        }

@@ -1,24 +1,5 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.utils import timezone
-
-class UserStreak(models.Model):
-    """Track user's daily logging streaks"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='streak')
-    current_streak = models.IntegerField(default=0)
-    longest_streak = models.IntegerField(default=0)
-    last_activity_date = models.DateField(null=True, blank=True)
-    total_transactions = models.IntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.user.username} - Streak: {self.current_streak}"
-
-    class Meta:
-        db_table = 'user_streaks'
-
-
 class Achievement(models.Model):
     """Define available achievements"""
     ACHIEVEMENT_TYPES = [
@@ -44,7 +25,6 @@ class Achievement(models.Model):
         db_table = 'achievements'
         ordering = ['achievement_type', 'requirement_value']
 
-
 class UserAchievement(models.Model):
     """Track which achievements users have unlocked"""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='achievements')
@@ -59,7 +39,6 @@ class UserAchievement(models.Model):
         db_table = 'user_achievements'
         unique_together = ['user', 'achievement']
         ordering = ['-unlocked_at']
-
 
 class UserStats(models.Model):
     """Track overall user statistics"""

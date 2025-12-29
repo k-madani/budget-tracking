@@ -300,67 +300,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* 2. STREAK SECTION */}
-        {(streak && streak.current > 0) || (level && level.current > 0) ? (
-          <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-xl p-8 mb-12 border border-primary/20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-8">
-                {streak && streak.current > 0 && (
-                  <Link href="/progress" className="group">
-                    <div className="flex items-center space-x-3">
-                      <div className="text-4xl">🔥</div>
-                      <div>
-                        <p className="text-3xl font-bold text-foreground group-hover:text-primary transition-colors">
-                          {streak.current} days
-                        </p>
-                        <p className="text-sm text-muted-foreground">Logging streak</p>
-                      </div>
-                    </div>
-                  </Link>
-                )}
-                
-                {savingsRate >= 20 && (
-                  <Link href="/progress" className="group">
-                    <div className="flex items-center space-x-3 pl-8 border-l border-gray-300 dark:border-border">
-                      <div className="text-4xl">💰</div>
-                      <div>
-                        <p className="text-3xl font-bold text-green-600 dark:text-green-500 group-hover:text-green-700 dark:group-hover:text-green-400 transition-colors">
-                          {savingsRate.toFixed(0)}%
-                        </p>
-                        <p className="text-sm text-muted-foreground">Savings rate</p>
-                      </div>
-                    </div>
-                  </Link>
-                )}
-
-                {level && level.current > 0 && (
-                  <Link href="/progress" className="group">
-                    <div className="flex items-center space-x-3 pl-8 border-l border-gray-300 dark:border-border">
-                      <div className="text-4xl">⭐</div>
-                      <div>
-                        <p className="text-3xl font-bold text-foreground group-hover:text-primary transition-colors">
-                          Level {level.current}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{level.points_to_next_level} pts to next</p>
-                      </div>
-                    </div>
-                  </Link>
-                )}
-              </div>
-              
-              <Link 
-                href="/progress"
-                className="text-primary hover:text-primary/80 font-medium text-sm transition-colors flex items-center space-x-1"
-              >
-                <span>View Progress</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-          </div>
-        ) : null}
-
         {/* 3. ANALYTICS & BUDGET HEALTH */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
           {/* This Week's Spending */}

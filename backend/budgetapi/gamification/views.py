@@ -3,8 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Count
-from .models import UserStreak, UserStats, Achievement, UserAchievement
-from .utils import get_streak_status, update_user_streak
+from .models import UserStats, Achievement, UserAchievement
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -16,9 +15,6 @@ def get_gamification_stats(request):
     
     # Get or create user stats
     stats, _ = UserStats.objects.get_or_create(user=user)
-    
-    # Get streak info
-    streak_status = get_streak_status(user)
     
     # Get achievements
     unlocked_achievements = UserAchievement.objects.filter(user=user).select_related('achievement')
@@ -42,12 +38,6 @@ def get_gamification_stats(request):
     points_to_next_level = next_level_points - stats.total_points
     
     return Response({
-        'streak': {
-            'current': streak_status['current_streak'],
-            'longest': streak_status['longest_streak'],
-            'status': streak_status['status'],
-            'message': streak_status['message']
-        },
         'level': {
             'current': stats.level,
             'total_points': stats.total_points,
@@ -137,13 +127,10 @@ def mark_achievements_seen(request):
 @permission_classes([IsAuthenticated])
 def get_leaderboard(request):
     """
-    Get leaderboard rankings (optional feature)
+    Get leaderboard rankings by level and points
     """
     # Top users by level
     top_by_level = UserStats.objects.select_related('user').order_by('-level', '-total_points')[:10]
-    
-    # Top users by streak
-    top_by_streak = UserStreak.objects.select_related('user').order_by('-current_streak')[:10]
     
     level_leaderboard = [{
         'rank': idx + 1,
@@ -151,13 +138,6 @@ def get_leaderboard(request):
         'level': stat.level,
         'points': stat.total_points
     } for idx, stat in enumerate(top_by_level)]
-    
-    streak_leaderboard = [{
-        'rank': idx + 1,
-        'username': streak.user.username,
-        'current_streak': streak.current_streak,
-        'longest_streak': streak.longest_streak
-    } for idx, streak in enumerate(top_by_streak)]
     
     # Get current user's rank
     user_stats = UserStats.objects.get(user=request.user)
@@ -170,10 +150,8 @@ def get_leaderboard(request):
     
     return Response({
         'level_leaderboard': level_leaderboard,
-        'streak_leaderboard': streak_leaderboard,
         'your_rank': user_rank
     })
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
