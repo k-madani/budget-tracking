@@ -60,17 +60,12 @@ export default function ForecastPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
     fetchForecastData();
-  }, [router]);
+  }, []);
 
   const fetchForecastData = async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
       if (!token) {
         router.push('/login');
         return;
@@ -87,10 +82,6 @@ export default function ForecastPage() {
         setSummary(data.summary);
         setForecasts(data.forecasts);
         setWarnings(data.warnings);
-      } else if (response.status === 401) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        router.push('/login');
       }
     } catch (error) {
       console.error('Error fetching forecast:', error);
@@ -353,6 +344,7 @@ export default function ForecastPage() {
           <p>🔄 Predictions automatically factor in your recurring transaction templates</p>
         </div>
       </div>
+
     </div>
   );
 }

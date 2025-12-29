@@ -23,6 +23,7 @@ from transactions.views import (
     categories, category_detail, templates, template_detail, create_from_template)
 from gamification.views import (get_gamification_stats, get_all_achievements, 
     mark_achievements_seen, get_new_achievements_count, get_leaderboard)
+from budgets.views import (get_forecast_summary, generate_forecast)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -42,14 +43,18 @@ urlpatterns = [
     path("api/categories", categories, name="categories"),
     path("api/categories/<uuid:pk>", category_detail, name="category-detail"),
 
-    # Gamification
+    # Achievements
     path('api/stats', get_gamification_stats, name='gamification-stats'),
     path('api/achievements', get_all_achievements, name='all-achievements'),
     path('api/achievements/mark-seen', mark_achievements_seen, name='mark-achievements-seen'),
     path('api/achievements/new-count', get_new_achievements_count, name='new-achievements-count'),
     path('api/leaderboard', get_leaderboard, name='leaderboard'),
 
-     path("api/templates", templates, name="templates"),
+    path("api/templates", templates, name="templates"),
     path("api/templates/<uuid:pk>", template_detail, name="template-detail"),
-    path("api/templates/<uuid:pk>/use", create_from_template, name="create-from-template")
+    path("api/templates/<uuid:pk>/use", create_from_template, name="create-from-template"),
+
+    # Forecasts
+    path('api/forecasts/summary', get_forecast_summary, name='forecast-summary'),
+    path('api/forecasts/generate', generate_forecast, name='generate-forecast')
 ]

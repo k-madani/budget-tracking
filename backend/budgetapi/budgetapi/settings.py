@@ -47,7 +47,8 @@ INSTALLED_APPS = [
     # local apps
     "accounts",
     "transactions",
-    "gamification"
+    "gamification",
+    "budgets"
 ]
 
 MIDDLEWARE = [

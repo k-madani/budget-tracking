@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 
 interface NavbarProps {
-  currentPage: 'dashboard' | 'transactions' | 'categories' | 'analytics' | 'gamification' | 'profile';
+  currentPage: 'dashboard' | 'transactions' | 'categories' | 'analytics' | 'gamification' | 'profile' | 'forecast';
 }
 
 export default function Navbar({ currentPage }: NavbarProps) {
@@ -17,7 +17,7 @@ export default function Navbar({ currentPage }: NavbarProps) {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     const initialTheme = savedTheme || systemTheme;
-    
+
     setTheme(initialTheme);
     document.documentElement.classList.toggle('dark', initialTheme === 'dark');
   }, []);
@@ -55,63 +55,66 @@ export default function Navbar({ currentPage }: NavbarProps) {
           </Link>
 
           <div className="flex items-center space-x-6">
-            <Link 
-              href="/dashboard" 
-              className={`text-sm font-medium ${
-                currentPage === 'dashboard'
+            <Link
+              href="/dashboard"
+              className={`text-sm font-medium ${currentPage === 'dashboard'
                   ? 'text-primary border-b-2 border-primary pb-0.5'
                   : 'text-muted-foreground hover:text-foreground transition-colors'
-              }`}
+                }`}
             >
               Dashboard
             </Link>
-            <Link 
-              href="/transactions" 
-              className={`text-sm font-medium ${
-                currentPage === 'transactions'
+            <Link
+              href="/transactions"
+              className={`text-sm font-medium ${currentPage === 'transactions'
                   ? 'text-primary border-b-2 border-primary pb-0.5'
                   : 'text-muted-foreground hover:text-foreground transition-colors'
-              }`}
+                }`}
             >
               Transactions
             </Link>
-            <Link 
-              href="/categories" 
-              className={`text-sm font-medium ${
-                currentPage === 'categories'
+            <Link
+              href="/categories"
+              className={`text-sm font-medium ${currentPage === 'categories'
                   ? 'text-primary border-b-2 border-primary pb-0.5'
                   : 'text-muted-foreground hover:text-foreground transition-colors'
-              }`}
+                }`}
             >
               Categories
             </Link>
-            <Link 
-              href="/analytics" 
-              className={`text-sm font-medium ${
-                currentPage === 'analytics'
+            <Link
+              href="/analytics"
+              className={`text-sm font-medium ${currentPage === 'analytics'
                   ? 'text-primary border-b-2 border-primary pb-0.5'
                   : 'text-muted-foreground hover:text-foreground transition-colors'
-              }`}
+                }`}
             >
               Analytics
             </Link>
-            <Link 
-              href="/gamification" 
-              className={`text-sm font-medium ${
-                currentPage === 'gamification'
+            <Link
+              href="/gamification"
+              className={`text-sm font-medium ${currentPage === 'gamification'
                   ? 'text-primary border-b-2 border-primary pb-0.5'
                   : 'text-muted-foreground hover:text-foreground transition-colors'
-              }`}
+                }`}
             >
               Progress
             </Link>
-            <Link 
-              href="/profile" 
-              className={`text-sm font-medium ${
-                currentPage === 'profile'
+            <Link
+              href="/forecast"
+              className={`text-sm font-medium ${currentPage === 'forecast'
                   ? 'text-primary border-b-2 border-primary pb-0.5'
                   : 'text-muted-foreground hover:text-foreground transition-colors'
-              }`}
+                }`}
+            >
+              Forecast
+            </Link>
+            <Link
+              href="/profile"
+              className={`text-sm font-medium ${currentPage === 'profile'
+                  ? 'text-primary border-b-2 border-primary pb-0.5'
+                  : 'text-muted-foreground hover:text-foreground transition-colors'
+                }`}
             >
               Profile
             </Link>
@@ -130,7 +133,7 @@ export default function Navbar({ currentPage }: NavbarProps) {
                 </svg>
               )}
             </button>
-            
+
             <button
               onClick={handleLogout}
               className="p-2 rounded-lg text-muted-foreground hover:text-red-500 transition-colors"
