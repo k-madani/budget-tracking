@@ -22,7 +22,6 @@ export default function CategoriesPage() {
   const dispatch = useDispatch();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -45,22 +44,8 @@ export default function CategoriesPage() {
       return;
     }
 
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    const initialTheme = savedTheme || systemTheme;
-    
-    setTheme(initialTheme);
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
-
     fetchCategories();
   }, [router]);
-
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
-  };
 
   const fetchCategories = async () => {
     try {
@@ -77,18 +62,6 @@ export default function CategoriesPage() {
       }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleLogout = () => {
-    try {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      dispatch(clearAuth());
-      toast.success('Logged out successfully');
-      router.push('/');
-    } catch (error) {
-      toast.error('Failed to logout');
     }
   };
 
@@ -213,22 +186,22 @@ export default function CategoriesPage() {
             {/* Filter Button */}
             <button
               onClick={() => setShowFilterModal(true)}
-              className={`relative px-4 py-3 bg-background border-2 ${
+              className={`relative px-4 py-3 bg-card/80 backdrop-blur-sm border-2 ${
                 hasActiveFilters ? 'border-primary' : 'border-border'
-              } text-foreground font-medium rounded-xl hover:bg-muted transition-colors flex items-center space-x-2`}
+              } text-foreground font-medium rounded-xl hover:shadow-lg transition-all hover:-translate-y-0.5 flex items-center space-x-2`}
             >
               <svg className={`w-5 h-5 ${hasActiveFilters ? 'text-primary' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
               <span>Filter</span>
               {hasActiveFilters && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full" />
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse" />
               )}
             </button>
 
             <button
               onClick={() => setShowAddModal(true)}
-              className="px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:opacity-90 transition-opacity flex items-center space-x-2 shadow-lg"
+              className="px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:scale-105 flex items-center space-x-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -240,7 +213,7 @@ export default function CategoriesPage() {
 
         {/* Active Filter Indicator */}
         {hasActiveFilters && (
-          <div className="mb-6 flex items-center justify-between bg-primary/10 border border-primary/20 rounded-lg px-4 py-3">
+          <div className="mb-6 flex items-center justify-between bg-primary/10 border-2 border-primary/20 rounded-xl px-4 py-3">
             <div className="flex items-center space-x-2">
               <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -259,7 +232,7 @@ export default function CategoriesPage() {
         )}
 
         {filteredCategories.length === 0 ? (
-          <div className="text-center py-12 bg-card border border-border rounded-xl">
+          <div className="text-center py-12 bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl">
             <svg className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
             </svg>
@@ -270,14 +243,14 @@ export default function CategoriesPage() {
             {hasActiveFilters ? (
               <button
                 onClick={() => setFilterType('all')}
-                className="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+                className="mt-4 px-4 py-2 bg-primary text-white rounded-xl hover:opacity-90 transition-opacity text-sm font-medium"
               >
                 Clear Filter
               </button>
             ) : (
               <button
                 onClick={() => setShowAddModal(true)}
-                className="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+                className="mt-4 px-4 py-2 bg-primary text-white rounded-xl hover:opacity-90 transition-opacity text-sm font-medium"
               >
                 Add Category
               </button>
@@ -289,8 +262,8 @@ export default function CategoriesPage() {
             {incomeCategories.length > 0 && (
               <div className="mb-10">
                 <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                     </svg>
                   </div>
@@ -315,8 +288,8 @@ export default function CategoriesPage() {
             {expenseCategories.length > 0 && (
               <div>
                 <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-8 h-8 rounded-lg bg-danger/10 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
                     </svg>
                   </div>
@@ -343,7 +316,7 @@ export default function CategoriesPage() {
       {/* Filter Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
+          <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-foreground">Filter Categories</h2>
               <button onClick={() => setShowFilterModal(false)} className="p-2 rounded-lg hover:bg-muted transition-colors">
@@ -359,10 +332,10 @@ export default function CategoriesPage() {
                 <div className="space-y-2">
                   <button
                     onClick={() => setFilterType('all')}
-                    className={`w-full py-3 px-4 rounded-lg font-medium transition-colors text-left flex items-center justify-between ${
+                    className={`w-full py-3 px-4 rounded-xl font-medium transition-all text-left flex items-center justify-between ${
                       filterType === 'all' 
-                        ? 'bg-primary text-white' 
-                        : 'bg-background border border-border text-foreground hover:bg-muted'
+                        ? 'bg-primary text-white shadow-lg' 
+                        : 'bg-muted border-2 border-border text-foreground hover:bg-muted/80'
                     }`}
                   >
                     <span>All Categories</span>
@@ -375,10 +348,10 @@ export default function CategoriesPage() {
                   
                   <button
                     onClick={() => setFilterType('INCOME')}
-                    className={`w-full py-3 px-4 rounded-lg font-medium transition-colors text-left flex items-center justify-between ${
+                    className={`w-full py-3 px-4 rounded-xl font-medium transition-all text-left flex items-center justify-between ${
                       filterType === 'INCOME' 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-background border border-border text-foreground hover:bg-muted'
+                        ? 'bg-success text-white shadow-lg' 
+                        : 'bg-muted border-2 border-border text-foreground hover:bg-muted/80'
                     }`}
                   >
                     <span>Income Only</span>
@@ -391,10 +364,10 @@ export default function CategoriesPage() {
                   
                   <button
                     onClick={() => setFilterType('EXPENSE')}
-                    className={`w-full py-3 px-4 rounded-lg font-medium transition-colors text-left flex items-center justify-between ${
+                    className={`w-full py-3 px-4 rounded-xl font-medium transition-all text-left flex items-center justify-between ${
                       filterType === 'EXPENSE' 
-                        ? 'bg-red-500 text-white' 
-                        : 'bg-background border border-border text-foreground hover:bg-muted'
+                        ? 'bg-danger text-white shadow-lg' 
+                        : 'bg-muted border-2 border-border text-foreground hover:bg-muted/80'
                     }`}
                   >
                     <span>Expense Only</span>
@@ -409,7 +382,7 @@ export default function CategoriesPage() {
 
               <button
                 onClick={() => setShowFilterModal(false)}
-                className="w-full py-3 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity font-semibold"
+                className="w-full py-3 px-4 bg-primary text-white rounded-xl hover:opacity-90 transition-opacity font-semibold"
               >
                 Apply Filter
               </button>
@@ -421,7 +394,7 @@ export default function CategoriesPage() {
       {/* Add Category Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
+          <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-foreground">Add Category</h2>
               <button onClick={resetForm} className="p-2 rounded-lg hover:bg-muted transition-colors">
@@ -442,7 +415,7 @@ export default function CategoriesPage() {
                   onChange={(e) => setName(e.target.value)}
                   required
                   placeholder="e.g., Groceries"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -454,8 +427,8 @@ export default function CategoriesPage() {
                   <button
                     type="button"
                     onClick={() => setType('EXPENSE')}
-                    className={`py-2.5 px-4 rounded-lg font-medium transition-colors ${
-                      type === 'EXPENSE' ? 'bg-red-500 text-white' : 'bg-background border border-border text-muted-foreground hover:text-foreground'
+                    className={`py-2.5 px-4 rounded-xl font-medium transition-all ${
+                      type === 'EXPENSE' ? 'bg-danger text-white shadow-lg' : 'bg-muted border-2 border-border text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     Expense
@@ -463,8 +436,8 @@ export default function CategoriesPage() {
                   <button
                     type="button"
                     onClick={() => setType('INCOME')}
-                    className={`py-2.5 px-4 rounded-lg font-medium transition-colors ${
-                      type === 'INCOME' ? 'bg-green-500 text-white' : 'bg-background border border-border text-muted-foreground hover:text-foreground'
+                    className={`py-2.5 px-4 rounded-xl font-medium transition-all ${
+                      type === 'INCOME' ? 'bg-success text-white shadow-lg' : 'bg-muted border-2 border-border text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     Income
@@ -484,7 +457,7 @@ export default function CategoriesPage() {
                     value={budgetLimit}
                     onChange={(e) => setBudgetLimit(e.target.value)}
                     placeholder="0.00"
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-4 py-2.5 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                   <p className="text-xs text-muted-foreground mt-1">Set a spending limit for this category per month</p>
                 </div>
@@ -495,14 +468,14 @@ export default function CategoriesPage() {
                   type="button"
                   onClick={resetForm}
                   disabled={submitting}
-                  className="flex-1 py-2.5 px-4 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+                  className="flex-1 py-2.5 px-4 bg-muted border-2 border-border text-foreground rounded-xl hover:bg-muted/80 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 py-2.5 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity font-semibold disabled:opacity-50"
+                  className="flex-1 py-2.5 px-4 bg-primary text-white rounded-xl hover:opacity-90 transition-opacity font-semibold disabled:opacity-50"
                 >
                   {submitting ? 'Adding...' : 'Add Category'}
                 </button>
@@ -515,7 +488,7 @@ export default function CategoriesPage() {
       {/* Edit Category Modal */}
       {showEditModal && editingCategory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
+          <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-foreground">Edit Category</h2>
               <button onClick={resetForm} className="p-2 rounded-lg hover:bg-muted transition-colors">
@@ -535,7 +508,7 @@ export default function CategoriesPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -547,8 +520,8 @@ export default function CategoriesPage() {
                   <button
                     type="button"
                     onClick={() => setType('EXPENSE')}
-                    className={`py-2.5 px-4 rounded-lg font-medium transition-colors ${
-                      type === 'EXPENSE' ? 'bg-red-500 text-white' : 'bg-background border border-border text-muted-foreground hover:text-foreground'
+                    className={`py-2.5 px-4 rounded-xl font-medium transition-all ${
+                      type === 'EXPENSE' ? 'bg-danger text-white shadow-lg' : 'bg-muted border-2 border-border text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     Expense
@@ -556,8 +529,8 @@ export default function CategoriesPage() {
                   <button
                     type="button"
                     onClick={() => setType('INCOME')}
-                    className={`py-2.5 px-4 rounded-lg font-medium transition-colors ${
-                      type === 'INCOME' ? 'bg-green-500 text-white' : 'bg-background border border-border text-muted-foreground hover:text-foreground'
+                    className={`py-2.5 px-4 rounded-xl font-medium transition-all ${
+                      type === 'INCOME' ? 'bg-success text-white shadow-lg' : 'bg-muted border-2 border-border text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     Income
@@ -577,7 +550,7 @@ export default function CategoriesPage() {
                     value={budgetLimit}
                     onChange={(e) => setBudgetLimit(e.target.value)}
                     placeholder="0.00"
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-4 py-2.5 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               )}
@@ -587,14 +560,14 @@ export default function CategoriesPage() {
                   type="button"
                   onClick={resetForm}
                   disabled={submitting}
-                  className="flex-1 py-2.5 px-4 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+                  className="flex-1 py-2.5 px-4 bg-muted border-2 border-border text-foreground rounded-xl hover:bg-muted/80 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 py-2.5 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity font-semibold disabled:opacity-50"
+                  className="flex-1 py-2.5 px-4 bg-primary text-white rounded-xl hover:opacity-90 transition-opacity font-semibold disabled:opacity-50"
                 >
                   {submitting ? 'Updating...' : 'Update Category'}
                 </button>
@@ -607,10 +580,10 @@ export default function CategoriesPage() {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && deletingCategory && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
+          <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center">
+                <svg className="w-6 h-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
@@ -620,7 +593,7 @@ export default function CategoriesPage() {
               </div>
             </div>
 
-            <div className="bg-muted/30 rounded-lg p-4 mb-6">
+            <div className="bg-muted/30 rounded-xl p-4 mb-6">
               <p className="text-sm text-foreground">
                 Are you sure you want to delete <span className="font-semibold">{deletingCategory.name}</span>?
               </p>
@@ -635,13 +608,13 @@ export default function CategoriesPage() {
                   setShowDeleteModal(false);
                   setDeletingCategory(null);
                 }}
-                className="flex-1 py-2.5 px-4 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
+                className="flex-1 py-2.5 px-4 bg-muted border-2 border-border text-foreground rounded-xl hover:bg-muted/80 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                className="flex-1 py-2.5 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold"
+                className="flex-1 py-2.5 px-4 bg-danger text-white rounded-xl hover:bg-danger/90 transition-colors font-semibold"
               >
                 Delete
               </button>
@@ -671,31 +644,31 @@ function CategoryCard({
   const isNearLimit = percentage > 80 && percentage <= 100;
 
   return (
-    <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+    <div className="group bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 hover:border-primary/40 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-            category.type === 'INCOME' ? 'bg-green-500/10' : 'bg-red-500/10'
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ${
+            category.type === 'INCOME' ? 'bg-success/10' : 'bg-danger/10'
           }`}>
-            <svg className={`w-6 h-6 ${category.type === 'INCOME' ? 'text-green-500' : 'text-red-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-6 h-6 ${category.type === 'INCOME' ? 'text-success' : 'text-danger'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={category.type === 'INCOME' ? "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" : "M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"} />
             </svg>
           </div>
           <div>
             <h3 className="font-semibold text-foreground">{category.name}</h3>
-            <span className={`text-xs font-medium ${category.type === 'INCOME' ? 'text-green-500' : 'text-red-500'}`}>
+            <span className={`text-xs font-medium ${category.type === 'INCOME' ? 'text-success' : 'text-danger'}`}>
               {category.type}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center space-x-1">
-          <button onClick={() => onEdit(category)} className="p-2 text-muted-foreground hover:text-primary transition-colors" title="Edit">
+        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => onEdit(category)} className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/10 rounded-lg" title="Edit">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
           </button>
-          <button onClick={() => onDelete(category)} className="p-2 text-muted-foreground hover:text-red-500 transition-colors" title="Delete">
+          <button onClick={() => onDelete(category)} className="p-2 text-muted-foreground hover:text-danger transition-colors hover:bg-danger/10 rounded-lg" title="Delete">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -709,20 +682,20 @@ function CategoryCard({
             <div>
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-muted-foreground">Spent this month:</span>
-                <span className={`font-semibold ${isOverBudget ? 'text-red-500' : isNearLimit ? 'text-yellow-500' : 'text-foreground'}`}>
+                <span className={`font-semibold ${isOverBudget ? 'text-danger' : isNearLimit ? 'text-warning' : 'text-foreground'}`}>
                   ${(category.current_spending || 0).toFixed(2)} / ${Number(category.budget_limit).toFixed(2)}
                 </span>
               </div>
               
-              <div className="w-full h-2 bg-border rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                 <div 
-                  className={`h-full transition-all duration-300 ${isOverBudget ? 'bg-red-500' : isNearLimit ? 'bg-yellow-500' : 'bg-primary'}`}
+                  className={`h-full transition-all duration-300 ${isOverBudget ? 'bg-danger' : isNearLimit ? 'bg-warning' : 'bg-primary'}`}
                   style={{ width: `${Math.min(percentage, 100)}%` }}
                 />
               </div>
 
               {isOverBudget && (
-                <p className="text-xs text-red-500 mt-2 flex items-center">
+                <p className="text-xs text-danger mt-2 flex items-center">
                   <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
@@ -730,7 +703,7 @@ function CategoryCard({
                 </p>
               )}
               {isNearLimit && !isOverBudget && (
-                <p className="text-xs text-yellow-500 mt-2 flex items-center">
+                <p className="text-xs text-warning mt-2 flex items-center">
                   <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>

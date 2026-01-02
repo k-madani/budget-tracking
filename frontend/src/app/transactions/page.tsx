@@ -54,7 +54,6 @@ export default function TransactionsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   
   // Filters
   const [filterType, setFilterType] = useState<'all' | 'INCOME' | 'EXPENSE'>('all');
@@ -68,6 +67,7 @@ export default function TransactionsPage() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -75,13 +75,6 @@ export default function TransactionsPage() {
       router.push('/login');
       return;
     }
-
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    const initialTheme = savedTheme || systemTheme;
-    
-    setTheme(initialTheme);
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
 
     fetchData();
   }, [router]);
@@ -216,6 +209,7 @@ export default function TransactionsPage() {
     setSearchQuery('');
     setDateFrom('');
     setDateTo('');
+    setShowAllTransactions(false);
   };
 
   const filteredTransactions = transactions.filter(t => {
@@ -236,6 +230,11 @@ export default function TransactionsPage() {
   const favoriteTemplates = templates.filter(t => t.is_favorite);
   const displayTemplates = favoriteTemplates.length > 0 ? favoriteTemplates : templates.slice(0, 5);
   const hasActiveFilters = filterType !== 'all' || filterCategory !== 'all' || searchQuery || dateFrom || dateTo;
+  
+  const displayedTransactions = showAllTransactions 
+    ? filteredTransactions 
+    : filteredTransactions.slice(0, 10);
+  const hasMoreTransactions = filteredTransactions.length > 10;
 
   if (loading) {
     return (
@@ -263,16 +262,16 @@ export default function TransactionsPage() {
             {/* Filter Button */}
             <button
               onClick={() => setShowFilterModal(true)}
-              className={`relative px-4 py-2 bg-background border-2 ${
+              className={`relative px-4 py-2.5 bg-card/80 backdrop-blur-sm border-2 ${
                 hasActiveFilters ? 'border-primary' : 'border-border'
-              } text-foreground font-medium rounded-lg hover:bg-muted transition-colors flex items-center space-x-2`}
+              } text-foreground font-medium rounded-xl hover:shadow-lg transition-all hover:-translate-y-0.5 flex items-center space-x-2`}
             >
               <svg className={`w-4 h-4 ${hasActiveFilters ? 'text-primary' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
               <span>Filter</span>
               {hasActiveFilters && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full" />
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse" />
               )}
             </button>
 
@@ -281,7 +280,7 @@ export default function TransactionsPage() {
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 disabled={filteredTransactions.length === 0}
-                className="px-4 py-2 bg-background border border-border text-foreground font-medium rounded-lg hover:bg-muted transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 bg-card/80 backdrop-blur-sm border-2 border-border text-foreground font-medium rounded-xl hover:shadow-lg transition-all hover:-translate-y-0.5 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -293,13 +292,13 @@ export default function TransactionsPage() {
               </button>
 
               {showExportMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-10">
+                <div className="absolute right-0 mt-2 w-48 bg-card/95 backdrop-blur-sm border-2 border-border rounded-xl shadow-2xl z-10 overflow-hidden">
                   <button
                     onClick={() => {
                       handleExportCSV();
                       setShowExportMenu(false);
                     }}
-                    className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors flex items-center space-x-2 rounded-t-lg"
+                    className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors flex items-center space-x-2"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -323,7 +322,7 @@ export default function TransactionsPage() {
                       handleExportPDF();
                       setShowExportMenu(false);
                     }}
-                    className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors flex items-center space-x-2 rounded-b-lg"
+                    className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-muted transition-colors flex items-center space-x-2"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -336,7 +335,7 @@ export default function TransactionsPage() {
 
             <button
               onClick={() => setShowAddModal(true)}
-              className="px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:opacity-90 transition-opacity flex items-center space-x-2 shadow-lg"
+              className="px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:scale-105 flex items-center space-x-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -346,12 +345,12 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        {/* Quick Templates - Horizontal Scroll Bar */}
+        {/* Quick Templates */}
         {displayTemplates.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-5 mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-foreground flex items-center space-x-2">
-                <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 mb-8 hover:border-primary/40 transition-all duration-300 hover:shadow-xl">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-bold text-foreground flex items-center space-x-2">
+                <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 <span>Quick Add</span>
@@ -361,41 +360,41 @@ export default function TransactionsPage() {
               </h3>
               <Link
                 href="/templates"
-                className="text-xs text-primary hover:underline font-medium"
+                className="text-sm text-primary hover:underline font-medium"
               >
                 Manage Templates →
               </Link>
             </div>
 
-            <div className="flex space-x-3 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {displayTemplates.map((template) => (
                 <button
                   key={template.id}
                   onClick={() => handleQuickAddFromTemplate(template)}
-                  className="group flex-shrink-0 w-52 bg-background hover:bg-primary/5 border-2 border-border hover:border-primary/50 rounded-xl p-4 transition-all hover:shadow-lg"
+                  className="group text-left bg-muted/30 hover:bg-primary/5 border-2 border-border hover:border-primary/50 rounded-xl p-4 transition-all hover:shadow-lg hover:-translate-y-1"
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      {template.is_favorite && <span className="text-base">⭐</span>}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-2 flex-1 min-w-0">
+                      {template.is_favorite && <span className="text-lg flex-shrink-0">⭐</span>}
                       <h4 className="font-bold text-foreground text-sm truncate group-hover:text-primary transition-colors">
                         {template.name}
                       </h4>
                     </div>
-                    <div className={`ml-2 flex-shrink-0 px-2 py-0.5 rounded text-xs font-bold ${
+                    <div className={`ml-2 flex-shrink-0 px-2 py-1 rounded text-xs font-bold ${
                       template.category_type === 'INCOME' 
-                        ? 'bg-green-500/10 text-green-600' 
-                        : 'bg-red-500/10 text-red-600'
+                        ? 'bg-success/10 text-success' 
+                        : 'bg-danger/10 text-danger'
                     }`}>
                       {template.category_type === 'INCOME' ? '+' : '-'}${parseFloat(template.amount).toFixed(2)}
                     </div>
                   </div>
                   
-                  <p className="text-xs text-muted-foreground mb-1 truncate">{template.category_name}</p>
+                  <p className="text-xs text-muted-foreground mb-1">{template.category_name}</p>
                   {template.note && (
                     <p className="text-xs text-muted-foreground/70 mb-3 truncate italic">{template.note}</p>
                   )}
                   
-                  <div className="flex items-center justify-center space-x-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity pt-2 border-t border-border">
+                  <div className="flex items-center justify-center space-x-1 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity pt-3 border-t border-border">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
@@ -409,7 +408,7 @@ export default function TransactionsPage() {
 
         {/* Active Filters Indicator */}
         {hasActiveFilters && (
-          <div className="mb-6 flex items-center justify-between bg-primary/10 border border-primary/20 rounded-lg px-4 py-3">
+          <div className="mb-6 flex items-center justify-between bg-primary/10 border-2 border-primary/20 rounded-xl px-4 py-3">
             <div className="flex items-center space-x-2 flex-wrap gap-2">
               <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -450,51 +449,59 @@ export default function TransactionsPage() {
           </div>
         )}
 
+        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-card border border-border rounded-xl p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-foreground">{filteredTransactions.length}</div>
-                <div className="text-sm text-muted-foreground">Total Transactions</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-green-500">${totalIncome.toFixed(2)}</div>
-                <div className="text-sm text-muted-foreground">Total Income</div>
+          <div className="group bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 hover:border-primary/40 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer">
+            <div className="relative">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-foreground">{filteredTransactions.length}</div>
+                  <div className="text-sm text-muted-foreground">Total Transactions</div>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-lg bg-red-500/10 flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-                </svg>
+          <div className="group bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 hover:border-success/40 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer">
+            <div className="relative">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <svg className="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-success">${totalIncome.toFixed(2)}</div>
+                  <div className="text-sm text-muted-foreground">Total Income</div>
+                </div>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-red-500">${totalExpenses.toFixed(2)}</div>
-                <div className="text-sm text-muted-foreground">Total Expenses</div>
+            </div>
+          </div>
+
+          <div className="group bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 hover:border-danger/40 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer">
+            <div className="relative">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-xl bg-danger/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <svg className="w-6 h-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-danger">${totalExpenses.toFixed(2)}</div>
+                  <div className="text-sm text-muted-foreground">Total Expenses</div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
+        {/* Transactions Table */}
+        <div className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl overflow-hidden hover:border-primary/40 transition-all duration-300 hover:shadow-xl">
           {filteredTransactions.length === 0 ? (
             <div className="text-center py-12">
               <svg className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -506,79 +513,112 @@ export default function TransactionsPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Date & Time</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Type</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Category</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Note</th>
-                    <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">Amount</th>
-                    <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredTransactions.map((transaction) => {
-                    const spentDate = new Date(transaction.spent_at);
-                    
-                    return (
-                      <tr key={transaction.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-4 text-sm text-foreground">
-                          <div>{spentDate.toLocaleDateString()}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {spentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            transaction.category_type === 'INCOME'
-                              ? 'bg-green-500/10 text-green-500'
-                              : 'bg-red-500/10 text-red-500'
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Date & Time</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Type</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Category</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Note</th>
+                      <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">Amount</th>
+                      <th className="px-6 py-4 text-right text-sm font-semibold text-foreground">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {displayedTransactions.map((transaction) => {
+                      const spentDate = new Date(transaction.spent_at);
+                      
+                      return (
+                        <tr key={transaction.id} className="hover:bg-muted/30 transition-colors group">
+                          <td className="px-6 py-4 text-sm text-foreground">
+                            <div>{spentDate.toLocaleDateString()}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {spentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              transaction.category_type === 'INCOME'
+                                ? 'bg-success/10 text-success'
+                                : 'bg-danger/10 text-danger'
+                            }`}>
+                              {transaction.category_type || 'N/A'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-muted-foreground">
+                            {transaction.category_name || 'Uncategorized'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-foreground max-w-xs truncate">
+                            {transaction.note || '-'}
+                          </td>
+                          <td className={`px-6 py-4 text-sm font-semibold text-right ${
+                            transaction.category_type === 'INCOME' 
+                              ? 'text-success' 
+                              : 'text-danger'
                           }`}>
-                            {transaction.category_type || 'N/A'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {transaction.category_name || 'Uncategorized'}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-foreground max-w-xs truncate">
-                          {transaction.note || '-'}
-                        </td>
-                        <td className={`px-6 py-4 text-sm font-semibold text-right ${
-                          transaction.category_type === 'INCOME' ? 'text-green-500' : 'text-red-500'
-                        }`}>
-                          {transaction.category_type === 'INCOME' ? '+' : '-'}
-                          ${parseFloat(transaction.amount).toFixed(2)} {transaction.currency}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end space-x-2">
-                            <button
-                              onClick={() => handleEdit(transaction)}
-                              className="p-2 text-muted-foreground hover:text-primary transition-colors"
-                              title="Edit"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => handleDelete(transaction.id)}
-                              className="p-2 text-muted-foreground hover:text-red-500 transition-colors"
-                              title="Delete"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            {transaction.category_type === 'INCOME' ? '+' : '-'}
+                            ${parseFloat(transaction.amount).toFixed(2)} {transaction.currency}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => handleEdit(transaction)}
+                                className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-primary/10 rounded-lg"
+                                title="Edit"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDelete(transaction.id)}
+                                className="p-2 text-muted-foreground hover:text-danger transition-colors hover:bg-danger/10 rounded-lg"
+                                title="Delete"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Show More Button */}
+              {hasMoreTransactions && !showAllTransactions && (
+                <div className="p-4 border-t border-border bg-muted/30">
+                  <button
+                    onClick={() => setShowAllTransactions(true)}
+                    className="w-full py-3 text-sm font-semibold text-primary hover:bg-card rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>Show More ({filteredTransactions.length - 10} more transactions)</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              
+              {showAllTransactions && hasMoreTransactions && (
+                <div className="p-4 border-t border-border bg-muted/30">
+                  <button
+                    onClick={() => setShowAllTransactions(false)}
+                    className="w-full py-3 text-sm font-semibold text-primary hover:bg-card rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>Show Less</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -586,7 +626,7 @@ export default function TransactionsPage() {
       {/* Filter Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+          <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-foreground">Filter Transactions</h2>
               <button onClick={() => setShowFilterModal(false)} className="p-2 rounded-lg hover:bg-muted transition-colors">
@@ -597,13 +637,12 @@ export default function TransactionsPage() {
             </div>
 
             <div className="space-y-5">
-              {/* Type Filter */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Type</label>
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value as any)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="all">All Types</option>
                   <option value="INCOME">Income</option>
@@ -611,13 +650,12 @@ export default function TransactionsPage() {
                 </select>
               </div>
 
-              {/* Category Filter */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Category</label>
                 <select
                   value={filterCategory}
                   onChange={(e) => setFilterCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="all">All Categories</option>
                   {categories.map(cat => (
@@ -628,7 +666,6 @@ export default function TransactionsPage() {
                 </select>
               </div>
 
-              {/* Date Range */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">From Date</label>
@@ -636,7 +673,7 @@ export default function TransactionsPage() {
                     type="date"
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-4 py-2.5 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div>
@@ -645,12 +682,11 @@ export default function TransactionsPage() {
                     type="date"
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-4 py-2.5 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
 
-              {/* Search */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Search</label>
                 <input
@@ -658,22 +694,21 @@ export default function TransactionsPage() {
                   placeholder="Search in notes..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
-              {/* Buttons */}
               <div className="flex space-x-3 pt-4">
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="flex-1 py-2.5 px-4 bg-background border border-border text-foreground rounded-lg hover:bg-muted transition-colors"
+                  className="flex-1 py-2.5 px-4 bg-muted border-2 border-border text-foreground rounded-xl hover:bg-muted/80 transition-colors"
                 >
                   Clear All
                 </button>
                 <button
                   onClick={() => setShowFilterModal(false)}
-                  className="flex-1 py-2.5 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity font-semibold"
+                  className="flex-1 py-2.5 px-4 bg-primary text-white rounded-xl hover:opacity-90 transition-opacity font-semibold"
                 >
                   Apply Filters
                 </button>
@@ -702,4 +737,4 @@ export default function TransactionsPage() {
       />
     </div>
   );
-}
+} 

@@ -55,6 +55,7 @@ export default function AnalyticsPage() {
     const [theme, setTheme] = useState<'light' | 'dark'>('dark');
     const [timeRange, setTimeRange] = useState<'7days' | '30days' | 'all'>('30days');
     const [showExportMenu, setShowExportMenu] = useState(false);
+    const [expandedInsight, setExpandedInsight] = useState<number | null>(null);
 
     useEffect(() => {
         const token = localStorage.getItem('access_token');
@@ -72,13 +73,6 @@ export default function AnalyticsPage() {
 
         fetchData();
     }, [router]);
-
-    const toggleTheme = () => {
-        const newTheme = theme === 'dark' ? 'light' : 'dark';
-        setTheme(newTheme);
-        localStorage.setItem('theme', newTheme);
-        document.documentElement.classList.toggle('dark', newTheme === 'dark');
-    };
 
     const fetchData = async () => {
         try {
@@ -104,18 +98,6 @@ export default function AnalyticsPage() {
             }
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleLogout = () => {
-        try {
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            dispatch(clearAuth());
-            toast.success('Logged out successfully');
-            router.push('/');
-        } catch (error) {
-            toast.error('Failed to logout');
         }
     };
 
@@ -324,32 +306,84 @@ export default function AnalyticsPage() {
         return subscriptions.sort((a, b) => b.amount - a.amount);
     };
 
+    const generateDynamicInsights = () => {
+        const filtered = getFilteredTransactions();
+        const totalIncome = filtered.filter(t => t.category_type === 'INCOME').reduce((sum, t) => sum + parseFloat(t.amount), 0);
+        const totalExpenses = filtered.filter(t => t.category_type === 'EXPENSE').reduce((sum, t) => sum + parseFloat(t.amount), 0);
+        const netSavings = totalIncome - totalExpenses;
+        const savingsRate = totalIncome > 0 ? (netSavings / totalIncome) * 100 : 0;
+        
+        const categoryBreakdown = getCategoryBreakdown();
+        const topCategory = categoryBreakdown[0];
+        const budgetVsActual = getBudgetVsActual();
+        const overBudgetCategories = budgetVsActual.filter(cat => cat.Actual > cat.Budget);
+        
+        const dayOfWeekSpending = [0, 0, 0, 0, 0, 0, 0];
+        filtered.forEach(t => {
+            if (t.category_type === 'EXPENSE') {
+                const day = new Date(t.spent_at).getDay();
+                dayOfWeekSpending[day] += parseFloat(t.amount);
+            }
+        });
+        const maxDayIndex = dayOfWeekSpending.indexOf(Math.max(...dayOfWeekSpending));
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const highestSpendingDay = days[maxDayIndex];
+        
+        let trendDirection = 'stable';
+        let trendPercentage = 0;
+        if (timeRange === '30days' && filtered.length > 0) {
+            const now = new Date();
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+            
+            const lastWeek = filtered.filter(t => 
+                t.category_type === 'EXPENSE' && 
+                new Date(t.spent_at) >= sevenDaysAgo
+            ).reduce((sum, t) => sum + parseFloat(t.amount), 0);
+            
+            const previousWeek = filtered.filter(t => 
+                t.category_type === 'EXPENSE' && 
+                new Date(t.spent_at) >= fourteenDaysAgo && 
+                new Date(t.spent_at) < sevenDaysAgo
+            ).reduce((sum, t) => sum + parseFloat(t.amount), 0);
+            
+            if (previousWeek > 0) {
+                trendPercentage = ((lastWeek - previousWeek) / previousWeek) * 100;
+                if (Math.abs(trendPercentage) > 10) {
+                    trendDirection = trendPercentage > 0 ? 'increasing' : 'decreasing';
+                }
+            }
+        }
+        
+        const largestExpense = filtered
+            .filter(t => t.category_type === 'EXPENSE')
+            .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))[0];
+        
+        return {
+            totalIncome,
+            totalExpenses,
+            netSavings,
+            savingsRate,
+            topCategory,
+            overBudgetCategories,
+            highestSpendingDay,
+            trendDirection,
+            trendPercentage,
+            largestExpense
+        };
+    };
+
     const CustomLineTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
             const activeData = payload.find((p: any) => p.value > 0);
             if (!activeData) return null;
 
             return (
-                <div style={{
-                    backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-                    border: `1px solid ${theme === 'dark' ? '#374151' : '#E5E7EB'}`,
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                }}>
-                    <p style={{
-                        color: theme === 'dark' ? '#F3F4F6' : '#1F2937',
-                        fontWeight: '600',
-                        fontSize: '12px',
-                        marginBottom: '4px'
-                    }}>
+                <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-xl p-3 shadow-xl">
+                    <p className="text-foreground font-semibold text-sm mb-1">
                         {label}
                     </p>
-                    <p style={{
-                        color: activeData.color,
-                        fontSize: '12px',
-                        fontWeight: '600'
-                    }}>
+                    <p className="text-xs font-semibold" style={{ color: activeData.color }}>
                         {activeData.name}: ${activeData.value.toFixed(2)}
                     </p>
                 </div>
@@ -363,26 +397,11 @@ export default function AnalyticsPage() {
             const data = payload[0];
 
             return (
-                <div style={{
-                    backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-                    border: `1px solid ${theme === 'dark' ? '#374151' : '#E5E7EB'}`,
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                }}>
-                    <p style={{
-                        color: theme === 'dark' ? '#F3F4F6' : '#1F2937',
-                        fontWeight: '600',
-                        fontSize: '12px',
-                        marginBottom: '4px'
-                    }}>
+                <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-xl p-3 shadow-xl">
+                    <p className="text-foreground font-semibold text-sm mb-1">
                         {data.payload.category}
                     </p>
-                    <p style={{
-                        color: data.fill,
-                        fontSize: '12px',
-                        fontWeight: '600'
-                    }}>
+                    <p className="text-xs font-semibold" style={{ color: data.fill }}>
                         {data.dataKey}: ${data.value.toFixed(2)}
                     </p>
                 </div>
@@ -396,26 +415,11 @@ export default function AnalyticsPage() {
             const data = payload[0];
 
             return (
-                <div style={{
-                    backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-                    border: `1px solid ${theme === 'dark' ? '#374151' : '#E5E7EB'}`,
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                }}>
-                    <p style={{
-                        color: theme === 'dark' ? '#F3F4F6' : '#1F2937',
-                        fontWeight: '600',
-                        fontSize: '12px',
-                        marginBottom: '4px'
-                    }}>
+                <div className="bg-card/95 backdrop-blur-sm border-2 border-border rounded-xl p-3 shadow-xl">
+                    <p className="text-foreground font-semibold text-sm mb-1">
                         {data.payload.name}
                     </p>
-                    <p style={{
-                        color: data.fill,
-                        fontSize: '14px',
-                        fontWeight: '700'
-                    }}>
+                    <p className="text-lg font-bold" style={{ color: data.fill }}>
                         ${data.value.toFixed(2)}
                     </p>
                 </div>
@@ -441,12 +445,14 @@ export default function AnalyticsPage() {
     const spendingTrend = getSpendingTrendData();
     const subscriptions = detectSubscriptions();
     const totalSubscriptionCost = subscriptions.reduce((sum, sub) => sum + sub.amount, 0);
+    const insights = generateDynamicInsights();
 
     return (
         <div className="min-h-screen bg-background">
             <Navbar currentPage="analytics" />
 
             <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
+                {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-foreground mb-1">Analytics</h1>
@@ -457,7 +463,7 @@ export default function AnalyticsPage() {
                         <button
                             onClick={handleExportCSV}
                             disabled={transactions.length === 0}
-                            className="px-4 py-2 bg-background border border-border text-foreground font-medium rounded-lg hover:bg-muted transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-4 py-2.5 bg-card/80 backdrop-blur-sm border-2 border-border text-foreground font-medium rounded-xl hover:shadow-lg transition-all hover:-translate-y-0.5 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -465,22 +471,22 @@ export default function AnalyticsPage() {
                             <span>Export CSV</span>
                         </button>
 
-                        <div className="flex items-center space-x-2 bg-card border border-border rounded-lg p-1">
+                        <div className="flex items-center space-x-2 bg-card/80 backdrop-blur-sm border-2 border-border rounded-xl p-1">
                             <button
                                 onClick={() => setTimeRange('7days')}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${timeRange === '7days' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === '7days' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}
                             >
                                 7 Days
                             </button>
                             <button
                                 onClick={() => setTimeRange('30days')}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${timeRange === '30days' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === '30days' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}
                             >
                                 30 Days
                             </button>
                             <button
                                 onClick={() => setTimeRange('all')}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${timeRange === 'all' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === 'all' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground hover:text-foreground'}`}
                             >
                                 All Time
                             </button>
@@ -489,19 +495,265 @@ export default function AnalyticsPage() {
                 </div>
 
                 {transactions.length === 0 ? (
-                    <div className="text-center py-12 bg-card border border-border rounded-xl">
+                    <div className="text-center py-12 bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl">
                         <svg className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                         <p className="text-muted-foreground mb-4">No transaction data available</p>
-                        <Link href="/transactions" className="inline-block px-6 py-3 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity font-medium">
+                        <Link href="/transactions" className="inline-block px-6 py-3 bg-primary text-white rounded-xl hover:opacity-90 transition-opacity font-medium">
                             Add your first transaction
                         </Link>
                     </div>
                 ) : (
                     <>
+                        {/* Conversational Intelligence Hub */}
+                        <div className="mb-8">
+                            {/* Monthly Story Card */}
+                            <div className="group bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-2 border-primary/20 rounded-2xl p-6 mb-6 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                        <span className="text-xl">💬</span>
+                                    </div>
+                                    <div className="flex-1">
+                                        <h2 className="text-lg font-bold text-foreground mb-2">
+                                            Your Financial Story This {timeRange === '7days' ? 'Week' : timeRange === '30days' ? 'Month' : 'Period'}
+                                        </h2>
+                                        <p className="text-foreground/90 leading-relaxed mb-4">
+                                            {insights.netSavings >= 0 
+                                                ? `Great work! You've saved ${insights.netSavings.toFixed(2)} this period. That's a ${insights.savingsRate.toFixed(0)}% savings rate. `
+                                                : `You spent ${Math.abs(insights.netSavings).toFixed(2)} more than you earned this period. `
+                                            }
+                                            {insights.topCategory && `Your biggest expense was ${insights.topCategory.name} at ${insights.topCategory.value.toFixed(2)}. `}
+                                            {insights.trendDirection === 'increasing' && `Your spending is trending up ${Math.abs(insights.trendPercentage).toFixed(0)}% compared to last week. `}
+                                            {insights.trendDirection === 'decreasing' && `Great news! Your spending dropped ${Math.abs(insights.trendPercentage).toFixed(0)}% compared to last week. `}
+                                            {insights.overBudgetCategories.length > 0 
+                                                ? `Watch out - ${insights.overBudgetCategories.length} ${insights.overBudgetCategories.length === 1 ? 'category is' : 'categories are'} over budget.`
+                                                : 'All your budgets are on track! 🎉'
+                                            }
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded">
+                                                {insights.overBudgetCategories.length} warnings
+                                            </span>
+                                            <span className="text-xs font-medium text-success bg-success/10 px-2 py-1 rounded">
+                                                {budgetVsActual.filter(cat => cat.Actual <= cat.Budget).length} on track
+                                            </span>
+                                            {insights.trendDirection !== 'stable' && (
+                                                <span className={`text-xs font-medium px-2 py-1 rounded ${
+                                                    insights.trendDirection === 'decreasing' 
+                                                        ? 'text-success bg-success/10' 
+                                                        : 'text-warning bg-warning/10'
+                                                }`}>
+                                                    {insights.trendDirection === 'decreasing' ? '↓' : '↑'} Trending {insights.trendDirection}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Dynamic Insight Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Insight 1: Savings Rate */}
+                                <div 
+                                    onClick={() => setExpandedInsight(expandedInsight === 1 ? null : 1)}
+                                    className="group bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-5 hover:border-primary/40 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer"
+                                >
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                            <span className="text-lg">💡</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="text-sm font-semibold text-foreground mb-1">
+                                                {insights.savingsRate > 20 ? 'Excellent Savings!' : insights.savingsRate > 10 ? 'Good Progress' : 'Opportunity to Save'}
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                {insights.savingsRate > 20 
+                                                    ? `${insights.savingsRate.toFixed(0)}% savings rate - you're crushing it!`
+                                                    : insights.savingsRate > 10
+                                                    ? `${insights.savingsRate.toFixed(0)}% saved. Aim for 20%+ for faster goals.`
+                                                    : insights.savingsRate > 0
+                                                    ? `${insights.savingsRate.toFixed(0)}% saved. Small wins add up!`
+                                                    : 'Spending exceeded income this period.'
+                                                }
+                                            </p>
+                                        </div>
+                                        <svg className={`w-4 h-4 text-muted-foreground transition-transform ${expandedInsight === 1 ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                    
+                                    {expandedInsight === 1 && (
+                                        <div className="mt-4 pt-4 border-t border-border space-y-3 animate-slide-up">
+                                            <div className="bg-muted/30 rounded-xl p-3">
+                                                <p className="text-xs text-muted-foreground mb-2">
+                                                    <strong>Quick Calculation:</strong>
+                                                </p>
+                                                <p className="text-xs text-foreground">
+                                                    Income: ${insights.totalIncome.toFixed(2)}<br/>
+                                                    Expenses: ${insights.totalExpenses.toFixed(2)}<br/>
+                                                    Saved: ${insights.netSavings.toFixed(2)} ({insights.savingsRate.toFixed(1)}%)
+                                                </p>
+                                            </div>
+                                            {insights.savingsRate < 20 && (
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toast.success('Tip: Review your top expense category to find savings!');
+                                                    }}
+                                                    className="w-full py-2 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
+                                                >
+                                                    💡 Show me how to save more
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Insight 2: Budget Warning */}
+                                <div 
+                                    onClick={() => setExpandedInsight(expandedInsight === 2 ? null : 2)}
+                                    className="group bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-5 hover:border-warning/40 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer"
+                                >
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="w-8 h-8 bg-warning/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                            <span className="text-lg">⚠️</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="text-sm font-semibold text-foreground mb-1">
+                                                {insights.overBudgetCategories.length > 0 
+                                                    ? 'Budget Alert' 
+                                                    : insights.highestSpendingDay 
+                                                    ? 'Spending Pattern'
+                                                    : 'Watch Out'
+                                                }
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                {insights.overBudgetCategories.length > 0
+                                                    ? `${insights.overBudgetCategories[0].category} over by ${(insights.overBudgetCategories[0].Actual - insights.overBudgetCategories[0].Budget).toFixed(2)}`
+                                                    : totalSubscriptionCost > 0
+                                                    ? `${subscriptions.length} subscriptions = ${totalSubscriptionCost.toFixed(2)}/month`
+                                                    : `Most spending on ${insights.highestSpendingDay}s`
+                                                }
+                                            </p>
+                                        </div>
+                                        <svg className={`w-4 h-4 text-muted-foreground transition-transform ${expandedInsight === 2 ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                    
+                                    {expandedInsight === 2 && (
+                                        <div className="mt-4 pt-4 border-t border-border space-y-3 animate-slide-up">
+                                            {insights.overBudgetCategories.length > 0 ? (
+                                                <>
+                                                    <div className="bg-danger/10 rounded-xl p-3">
+                                                        <p className="text-xs font-semibold text-danger mb-2">
+                                                            Over Budget Categories:
+                                                        </p>
+                                                        {insights.overBudgetCategories.slice(0, 3).map((cat, i) => (
+                                                            <p key={i} className="text-xs text-foreground">
+                                                                • {cat.category}: +${(cat.Actual - cat.Budget).toFixed(2)}
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                    <Link
+                                                        href="/categories"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="block w-full py-2 text-xs font-semibold text-center text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
+                                                    >
+                                                        Adjust budgets →
+                                                    </Link>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="bg-muted/30 rounded-xl p-3">
+                                                        <p className="text-xs text-foreground">
+                                                            💡 <strong>Pattern detected:</strong> You spend most on {insights.highestSpendingDay}s. 
+                                                            Planning ahead might help reduce impulse purchases.
+                                                        </p>
+                                                    </div>
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toast.success('Great idea! Try setting a specific budget for weekends.');
+                                                        }}
+                                                        className="w-full py-2 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
+                                                    >
+                                                        Set weekly budget reminder
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Insight 3: Trend */}
+                                <div 
+                                    onClick={() => setExpandedInsight(expandedInsight === 3 ? null : 3)}
+                                    className="group bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-5 hover:border-success/40 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer"
+                                >
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="w-8 h-8 bg-success/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                            <span className="text-lg">
+                                                {insights.trendDirection === 'decreasing' ? '🎯' : insights.netSavings > 0 ? '✨' : '📊'}
+                                            </span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="text-sm font-semibold text-foreground mb-1">
+                                                {insights.trendDirection === 'decreasing' 
+                                                    ? 'Spending Decreased!' 
+                                                    : insights.trendDirection === 'increasing'
+                                                    ? 'Spending Increased'
+                                                    : 'Financial Health'
+                                                }
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                {insights.trendDirection === 'decreasing'
+                                                    ? `Down ${Math.abs(insights.trendPercentage).toFixed(0)}% from last week. Keep it up!`
+                                                    : insights.trendDirection === 'increasing'
+                                                    ? `Up ${Math.abs(insights.trendPercentage).toFixed(0)}% from last week. Stay mindful.`
+                                                    : budgetVsActual.length > 0
+                                                    ? `${budgetVsActual.filter(cat => cat.Actual <= cat.Budget).length}/${budgetVsActual.length} budgets healthy`
+                                                    : `${getFilteredTransactions().length} transactions tracked`
+                                                }
+                                            </p>
+                                        </div>
+                                        <svg className={`w-4 h-4 text-muted-foreground transition-transform ${expandedInsight === 3 ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                    
+                                    {expandedInsight === 3 && (
+                                        <div className="mt-4 pt-4 border-t border-border space-y-3 animate-slide-up">
+                                            {insights.largestExpense && (
+                                                <div className="bg-muted/30 rounded-xl p-3">
+                                                    <p className="text-xs font-semibold text-foreground mb-2">
+                                                        Largest Expense:
+                                                    </p>
+                                                    <p className="text-sm text-foreground">
+                                                        ${parseFloat(insights.largestExpense.amount).toFixed(2)} - {insights.largestExpense.category_name || 'Uncategorized'}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        {insights.largestExpense.note || 'No note'}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            <Link
+                                                href="/transactions"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="block w-full py-2 text-xs font-semibold text-center text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
+                                            >
+                                                View all transactions →
+                                            </Link>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Subscriptions Alert */}
                         {subscriptions.length > 0 && (
-                            <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-6 mb-8">
+                            <div className="bg-gradient-to-br from-accent/10 to-accent/5 border-2 border-accent/20 rounded-2xl p-6 mb-8 hover:shadow-xl transition-all hover:-translate-y-1">
                                 <div className="flex items-center justify-between mb-6">
                                     <div>
                                         <h2 className="text-xl font-bold text-foreground mb-1">Recurring Expenses Detected</h2>
@@ -515,13 +767,13 @@ export default function AnalyticsPage() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {subscriptions.map((sub, index) => (
-                                        <div key={index} className="bg-card/50 backdrop-blur border border-border rounded-lg p-4">
+                                        <div key={index} className="group bg-card/50 backdrop-blur border-2 border-border rounded-xl p-4 hover:border-accent/40 hover:shadow-lg transition-all hover:-translate-y-1">
                                             <div className="flex items-start justify-between mb-2">
                                                 <div className="flex-1">
                                                     <h3 className="font-semibold text-foreground mb-1 truncate">{sub.name}</h3>
                                                     <p className="text-xs text-muted-foreground">{sub.category}</p>
                                                 </div>
-                                                <div className={`px-2 py-1 rounded text-xs font-medium ${sub.amount > 50 ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                                                <div className={`px-2 py-1 rounded text-xs font-medium ${sub.amount > 50 ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'}`}>
                                                     {sub.amount > 50 ? 'High' : 'Low'}
                                                 </div>
                                             </div>
@@ -536,13 +788,13 @@ export default function AnalyticsPage() {
                                     ))}
                                 </div>
 
-                                <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                                <div className="mt-4 p-4 bg-warning/10 border-2 border-warning/20 rounded-xl">
                                     <div className="flex items-start space-x-2">
-                                        <svg className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-5 h-5 text-warning mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                         <div className="flex-1">
-                                            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-500">
+                                            <p className="text-sm font-medium text-warning">
                                                 Subscriptions account for ${totalSubscriptionCost.toFixed(2)}/month
                                             </p>
                                             <p className="text-xs text-muted-foreground mt-1">
@@ -554,8 +806,15 @@ export default function AnalyticsPage() {
                             </div>
                         )}
 
-                        <div className="bg-card border border-border rounded-xl p-6 mb-8">
-                            <h2 className="text-xl font-bold text-foreground mb-6">Spending Trend</h2>
+                        {/* Spending Trend Chart */}
+                        <div className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 mb-8 hover:border-primary/40 hover:shadow-xl transition-all">
+                            <div className="mb-4">
+                                <h2 className="text-xl font-bold text-foreground mb-2">Spending Trend</h2>
+                                <p className="text-sm text-muted-foreground">
+                                    💬 Your spending has been {insights.netSavings >= 0 ? 'under control' : 'higher than income'} this period. 
+                                    {insights.netSavings >= 0 ? ' Keep up the great work!' : ' Consider reviewing your largest expenses.'}
+                                </p>
+                            </div>
                             <ResponsiveContainer width="100%" height={350}>
                                 <LineChart data={spendingTrend} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#374151' : '#E5E7EB'} opacity={0.3} />
@@ -569,9 +828,19 @@ export default function AnalyticsPage() {
                             </ResponsiveContainer>
                         </div>
 
+                        {/* Charts Grid */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                            <div className="bg-card border border-border rounded-xl p-6">
-                                <h2 className="text-xl font-bold text-foreground mb-6">Expense Distribution</h2>
+                            {/* Expense Distribution */}
+                            <div className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 hover:border-primary/40 hover:shadow-xl transition-all">
+                                <div className="mb-4">
+                                    <h2 className="text-xl font-bold text-foreground mb-2">Expense Distribution</h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        💬 {insights.topCategory 
+                                            ? `${insights.topCategory.name} is your biggest expense (${((insights.topCategory.value / insights.totalExpenses) * 100).toFixed(0)}%). ${insights.topCategory.value > insights.totalExpenses * 0.3 ? 'Consider if this aligns with your priorities.' : 'This seems balanced.'}`
+                                            : 'Start tracking expenses to see your breakdown.'
+                                        }
+                                    </p>
+                                </div>
                                 {categoryBreakdown.length > 0 ? (
                                     <>
                                         <ResponsiveContainer width="100%" height={280}>
@@ -600,8 +869,8 @@ export default function AnalyticsPage() {
                                                 <Tooltip
                                                     contentStyle={{
                                                         backgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-                                                        border: `1px solid ${theme === 'dark' ? '#374151' : '#E5E7EB'}`,
-                                                        borderRadius: '8px',
+                                                        border: `2px solid ${theme === 'dark' ? '#374151' : '#E5E7EB'}`,
+                                                        borderRadius: '12px',
                                                         padding: '8px 12px',
                                                         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
                                                         color: theme === 'dark' ? '#F3F4F6' : '#1F2937'
@@ -639,8 +908,19 @@ export default function AnalyticsPage() {
                                 )}
                             </div>
 
-                            <div className="bg-card border border-border rounded-xl p-6">
-                                <h2 className="text-xl font-bold text-foreground mb-6">Budget vs Actual</h2>
+                            {/* Budget vs Actual */}
+                            <div className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 hover:border-primary/40 hover:shadow-xl transition-all">
+                                <div className="mb-4">
+                                    <h2 className="text-xl font-bold text-foreground mb-2">Budget vs Actual</h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        💬 {insights.overBudgetCategories.length > 0
+                                            ? `You're over budget in ${insights.overBudgetCategories.length} ${insights.overBudgetCategories.length === 1 ? 'category' : 'categories'}. Time to adjust spending or budgets.`
+                                            : budgetVsActual.length > 0
+                                            ? 'All budgets are looking healthy! Great financial discipline. 🎉'
+                                            : 'Set budget limits to track your spending goals.'
+                                        }
+                                    </p>
+                                </div>
                                 {budgetVsActual.length > 0 ? (
                                     <>
                                         <ResponsiveContainer width="100%" height={280}>
@@ -668,7 +948,7 @@ export default function AnalyticsPage() {
                                                 return (
                                                     <div key={index} className="flex items-center justify-between text-xs py-1">
                                                         <span className="text-muted-foreground">{item.category}</span>
-                                                        <span className={`font-medium ${isOver ? 'text-red-500' : 'text-green-500'}`}>
+                                                        <span className={`font-medium ${isOver ? 'text-danger' : 'text-success'}`}>
                                                             {isOver ? '+' : '-'}${Math.abs(difference).toFixed(2)} ({isOver ? '+' : '-'}{percentage.toFixed(0)}%)
                                                         </span>
                                                     </div>
@@ -692,8 +972,22 @@ export default function AnalyticsPage() {
                             </div>
                         </div>
 
-                        <div className="bg-card border border-border rounded-xl p-6 mb-8">
-                            <h2 className="text-xl font-bold text-foreground mb-6">Income vs Expenses</h2>
+                        {/* Income vs Expenses */}
+                        <div className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 mb-8 hover:border-primary/40 hover:shadow-xl transition-all">
+                            <div className="mb-4">
+                                <h2 className="text-xl font-bold text-foreground mb-2">Income vs Expenses</h2>
+                                <p className="text-sm text-muted-foreground">
+                                    💬 You're saving {insights.savingsRate.toFixed(0)}% of your income this period. 
+                                    {insights.savingsRate >= 20 
+                                        ? ' Excellent work - you\'re on track for financial freedom! 🎯'
+                                        : insights.savingsRate >= 10
+                                        ? ' Good progress! Aim for 20%+ for faster wealth building.'
+                                        : insights.savingsRate > 0
+                                        ? ' Every bit counts! Try to gradually increase this percentage.'
+                                        : ' Consider ways to reduce expenses or increase income.'
+                                    }
+                                </p>
+                            </div>
                             <ResponsiveContainer width="100%" height={300}>
                                 <BarChart data={incomeExpenseData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#374151' : '#E5E7EB'} opacity={0.3} />
@@ -709,19 +1003,19 @@ export default function AnalyticsPage() {
                             </ResponsiveContainer>
 
                             <div className="mt-6 grid grid-cols-3 gap-4">
-                                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 text-center">
+                                <div className="group bg-success/10 border-2 border-success/20 rounded-xl p-4 text-center hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer">
                                     <p className="text-xs text-muted-foreground mb-1">Total Income</p>
-                                    <p className="text-xl font-bold text-green-600 dark:text-green-500">
+                                    <p className="text-xl font-bold text-success">
                                         ${incomeExpenseData.find(d => d.name === 'Income')?.amount.toFixed(2) || '0.00'}
                                     </p>
                                 </div>
-                                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-center">
+                                <div className="group bg-danger/10 border-2 border-danger/20 rounded-xl p-4 text-center hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer">
                                     <p className="text-xs text-muted-foreground mb-1">Total Expenses</p>
-                                    <p className="text-xl font-bold text-red-600 dark:text-red-500">
+                                    <p className="text-xl font-bold text-danger">
                                         ${incomeExpenseData.find(d => d.name === 'Expenses')?.amount.toFixed(2) || '0.00'}
                                     </p>
                                 </div>
-                                <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center">
+                                <div className="group bg-primary/10 border-2 border-primary/20 rounded-xl p-4 text-center hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer">
                                     <p className="text-xs text-muted-foreground mb-1">Net Savings</p>
                                     <p className="text-xl font-bold text-primary">
                                         ${((incomeExpenseData.find(d => d.name === 'Income')?.amount || 0) - (incomeExpenseData.find(d => d.name === 'Expenses')?.amount || 0)).toFixed(2)}
