@@ -27,6 +27,32 @@ interface Category {
   current_spending?: number;
 }
 
+interface LevelData {
+  current: number;
+  total_points: number;
+  points_to_next_level: number;
+  progress_percentage: number;
+}
+
+interface Achievement {
+  id: number;
+  name: string;
+  description: string;
+  icon: string;
+  points: number;
+  is_unlocked: boolean;
+}
+
+interface GamificationStats {
+  total_points: number;
+  level: LevelData;
+  achievements: {
+    unlocked: Achievement[];
+    unlocked_count: number;
+    total_count: number;
+  };
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
@@ -34,6 +60,7 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [gamificationStats, setGamificationStats] = useState<GamificationStats | null>(null);
 
   const [balance, setBalance] = useState(0);
   const [income, setIncome] = useState(0);
@@ -53,10 +80,11 @@ export default function DashboardPage() {
     try {
       setLoading(true);
 
-      const [summaryRes, transactionsRes, categoriesRes] = await Promise.all([
+      const [summaryRes, transactionsRes, categoriesRes, gamificationRes] = await Promise.all([
         api.get('/transactions/summary'),
         api.get('/transactions'),
         api.get('/categories'),
+        api.get('/stats').catch(() => null),
       ]);
 
       if (summaryRes.data) {
@@ -70,6 +98,10 @@ export default function DashboardPage() {
       setRecentTransactions(allTxns.slice(0, 4));
 
       setCategories(categoriesRes.data || []);
+
+      if (gamificationRes?.data) {
+        setGamificationStats(gamificationRes.data);
+      }
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to load dashboard data');
@@ -229,6 +261,80 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Progress Section */}
+        {gamificationStats && (
+          <div className="mb-8">
+            <Link 
+              href="/gamification"
+              className="group block relative overflow-hidden bg-gradient-to-br from-accent/10 via-primary/5 to-warning/5 border-2 border-primary/20 rounded-2xl p-6 hover:border-primary/40 hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+            >
+              {/* Animated background */}
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              
+              <div className="relative">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-primary/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <span className="text-3xl">🎯</span>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-foreground mb-1">Your Progress & Achievements</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {gamificationStats.total_points} points earned • {gamificationStats.achievements?.unlocked_count || 0}/{gamificationStats.achievements?.total_count || 0} unlocked
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <svg className="w-6 h-6 text-primary group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+
+                {/* Progress Bar */}
+                {gamificationStats.achievements && (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="font-medium text-muted-foreground">Achievement Progress</span>
+                      <span className="font-bold text-primary">
+                        {((gamificationStats.achievements.unlocked_count / gamificationStats.achievements.total_count) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
+                        style={{ width: `${(gamificationStats.achievements.unlocked_count / gamificationStats.achievements.total_count) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Achievements Preview */}
+                {gamificationStats.achievements?.unlocked && gamificationStats.achievements.unlocked.length > 0 ? (
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Recent unlocked:</span>
+                    {gamificationStats.achievements.unlocked.slice(0, 5).map((achievement) => (
+                      <div 
+                        key={achievement.id}
+                        className="flex items-center gap-2 bg-card/50 backdrop-blur-sm border border-border rounded-lg px-3 py-2 whitespace-nowrap group-hover:scale-105 transition-transform"
+                      >
+                        <span className="text-lg">{achievement.icon}</span>
+                        <span className="text-xs font-medium text-foreground">{achievement.name}</span>
+                        <span className="text-xs text-primary font-bold">+{achievement.points}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-muted/30 rounded-xl p-4 border border-border">
+                    <p className="text-sm text-muted-foreground text-center">
+                      🚀 Start tracking transactions to unlock your first achievement!
+                    </p>
+                  </div>
+                )}
+              </div>
+            </Link>
+          </div>
+        )}
 
         {/* Analytics Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
