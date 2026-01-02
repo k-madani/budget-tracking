@@ -66,15 +66,20 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-background">
       {/* Left Panel - Visual */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#0B1120] via-[#1C2539] to-[#0B1120] p-12 flex-col justify-between relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10"></div>
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary/90 to-accent p-12 flex-col justify-between relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+            backgroundSize: '40px 40px'
+          }} />
+        </div>
         
         <div className="relative z-10">
           <Link href="/" className="flex items-center space-x-3 group">
-            <div className="w-12 h-12 rounded-xl bg-primary/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform border border-primary/30">
-              <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform border-2 border-white/30">
+              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -86,56 +91,56 @@ export default function LoginPage() {
           <h1 className="text-5xl font-bold text-white leading-tight">
             Welcome Back
           </h1>
-          <p className="text-xl text-gray-300">
+          <p className="text-xl text-white/90">
             Continue managing your finances with clarity and precision. Your financial insights await.
           </p>
           
           <div className="grid grid-cols-2 gap-4 pt-8">
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer group">
-              <div className="text-3xl font-bold text-white mb-1 group-hover:text-primary transition-colors">Track</div>
-              <div className="text-gray-300">Every transaction</div>
+            <div className="group bg-white/10 backdrop-blur-sm rounded-2xl p-4 border-2 border-white/20 hover:bg-white/20 transition-all cursor-pointer hover:scale-105">
+              <div className="text-3xl font-bold text-white mb-1 group-hover:scale-110 transition-transform">Track</div>
+              <div className="text-white/80">Every transaction</div>
             </div>
-            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer group">
-              <div className="text-3xl font-bold text-white mb-1 group-hover:text-primary transition-colors">Analyze</div>
-              <div className="text-gray-300">Your spending</div>
+            <div className="group bg-white/10 backdrop-blur-sm rounded-2xl p-4 border-2 border-white/20 hover:bg-white/20 transition-all cursor-pointer hover:scale-105">
+              <div className="text-3xl font-bold text-white mb-1 group-hover:scale-110 transition-transform">Analyze</div>
+              <div className="text-white/80">Your spending</div>
             </div>
           </div>
         </div>
 
-        <div className="relative z-10 text-gray-400 text-sm">
+        <div className="relative z-10 text-white/60 text-sm">
           © 2025 Budgetly. Your finances, simplified.
         </div>
       </div>
 
-      {/* Right Panel - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50 dark:bg-background">
+      {/* Right Panel - Form (Blended) */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gradient-to-bl from-background via-background to-primary/5">
         <div className="w-full max-w-md space-y-8">
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-foreground mb-2">Sign In</h2>
-              <p className="text-gray-600 dark:text-muted-foreground">Access your Budgetly dashboard</p>
+              <h2 className="text-3xl font-bold text-foreground mb-2">Sign In</h2>
+              <p className="text-muted-foreground">Access your Budgetly dashboard</p>
             </div>
             
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg border border-gray-200 dark:border-border hover:bg-gray-100 dark:hover:bg-muted transition-colors"
+              className="p-2 rounded-lg border-2 border-border hover:bg-muted hover:scale-110 transition-all"
               aria-label="Toggle theme"
             >
               {theme === 'dark' ? (
-                <svg className="w-5 h-5 text-gray-600 dark:text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
               ) : (
-                <svg className="w-5 h-5 text-gray-600 dark:text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                 </svg>
               )}
             </button>
           </div>
 
-          <div className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-900 dark:text-foreground mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
                 Email Address
               </label>
               <input
@@ -143,7 +148,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-white dark:bg-background border border-gray-300 dark:border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-gray-900 dark:text-foreground placeholder-gray-500 dark:placeholder-muted-foreground"
+                className="w-full px-4 py-3 bg-card/80 backdrop-blur-sm border-2 border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all text-foreground placeholder-muted-foreground"
                 placeholder="you@example.com"
                 disabled={loading}
               />
@@ -151,7 +156,7 @@ export default function LoginPage() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-900 dark:text-foreground">
+                <label htmlFor="password" className="block text-sm font-medium text-foreground">
                   Password
                 </label>
                 <Link href="/forgot-password" className="text-sm text-primary hover:underline">
@@ -164,7 +169,7 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-white dark:bg-background border border-gray-300 dark:border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-gray-900 dark:text-foreground placeholder-gray-500 dark:placeholder-muted-foreground pr-12"
+                  className="w-full px-4 py-3 bg-card/80 backdrop-blur-sm border-2 border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all text-foreground placeholder-muted-foreground pr-12"
                   placeholder="••••••••"
                   disabled={loading}
                   onKeyDown={(e) => {
@@ -176,7 +181,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 hover:bg-muted rounded-lg"
                 >
                   {showPassword ? (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -193,9 +198,9 @@ export default function LoginPage() {
             </div>
 
             <button
-              onClick={handleSubmit}
+              type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg"
+              className="w-full py-3 px-4 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl hover:scale-105"
             >
               {loading ? (
                 <>
@@ -206,10 +211,10 @@ export default function LoginPage() {
                 <span>Sign In</span>
               )}
             </button>
-          </div>
+          </form>
 
           <div className="text-center">
-            <p className="text-sm text-gray-600 dark:text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Don't have an account?{' '}
               <Link href="/register" className="text-primary hover:underline font-medium">
                 Create one
