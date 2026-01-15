@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
             const transactionData = transactionsRes.data as TransactionResponse;
             setTransactions(transactionData.results || []);
 
-            setCategories(categoriesRes.data || []);
+            setCategories(categoriesRes.data.results || []);
         } catch (error: any) {
             console.error('Failed to fetch data:', error);
             toast.error('Failed to load analytics data');

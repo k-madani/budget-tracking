@@ -97,7 +97,7 @@ export default function DashboardPage() {
       setAllTransactions(allTxns);
       setRecentTransactions(allTxns.slice(0, 4));
 
-      setCategories(categoriesRes.data || []);
+      setCategories(categoriesRes.data.results || []);
 
       if (gamificationRes?.data) {
         setGamificationStats(gamificationRes.data);

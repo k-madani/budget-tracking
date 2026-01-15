@@ -51,7 +51,7 @@ export default function CategoriesPage() {
     try {
       setLoading(true);
       const response = await api.get('/categories');
-      setCategories(response.data || []);
+      setCategories(response.data.results || []);
     } catch (error: any) {
       console.error('Failed to fetch categories:', error);
       toast.error('Failed to load categories');

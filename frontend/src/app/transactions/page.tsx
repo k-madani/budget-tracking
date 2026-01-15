@@ -102,8 +102,8 @@ export default function TransactionsPage() {
 
       const transactionData = transactionsRes.data as TransactionResponse;
       setTransactions(transactionData.results || []);
-      setCategories(categoriesRes.data || []);
-      setTemplates(templatesRes.data || []);
+      setCategories(categoriesRes.data.results || []);
+      setTemplates(templatesRes.data.results || templatesRes.data || []);
     } catch (error: any) {
       console.error('Failed to fetch data:', error);
       toast.error('Failed to load transactions');
