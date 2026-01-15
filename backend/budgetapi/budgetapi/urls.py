@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
-from accounts.views import register_view, login_view, reset_password_view
+from accounts.views import register_view, login_view, reset_password_view, user_profile, change_password
 from transactions.views import (
     transaction_detail, transactions, transactions_summary,
     categories, category_detail, templates, template_detail, create_from_template)
@@ -32,6 +32,10 @@ urlpatterns = [
     path("api/auth/login", login_view, name="login"),
     path("api/auth/reset-password", reset_password_view, name="reset-password"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+
+    # profile endpoints
+    path("api/auth/profile/", user_profile, name="user_profile"),
+    path("api/auth/change-password/", change_password, name="change_password"),
 
     # Transactions
     path("api/transactions", transactions, name="transactions"),
@@ -49,7 +53,7 @@ urlpatterns = [
     path('api/achievements/new-count', get_new_achievements_count, name='new-achievements-count'),
     path('api/leaderboard', get_leaderboard, name='leaderboard'),
 
-     path("api/templates", templates, name="templates"),
+    path("api/templates", templates, name="templates"),
     path("api/templates/<uuid:pk>", template_detail, name="template-detail"),
     path("api/templates/<uuid:pk>/use", create_from_template, name="create-from-template")
 ]

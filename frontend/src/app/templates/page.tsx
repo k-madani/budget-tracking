@@ -115,7 +115,7 @@ export default function TemplatesPage() {
           </div>
           <Link
             href="/transactions"
-            className="px-6 py-3 bg-primary text-white font-semibold rounded-lg hover:opacity-90 transition-opacity flex items-center space-x-2"
+            className="px-6 py-3 bg-card/80 backdrop-blur-sm border-2 border-border text-foreground font-semibold rounded-xl hover:shadow-lg transition-all hover:-translate-y-0.5 flex items-center space-x-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -125,7 +125,7 @@ export default function TemplatesPage() {
         </div>
 
         {templates.length === 0 ? (
-          <div className="text-center py-20 bg-card border border-border rounded-xl">
+          <div className="text-center py-20 bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl">
             <svg className="w-20 h-20 mx-auto text-muted-foreground/50 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
             </svg>
@@ -135,7 +135,7 @@ export default function TemplatesPage() {
             </p>
             <Link
               href="/transactions"
-              className="inline-flex items-center px-6 py-3 bg-primary text-white font-semibold rounded-lg hover:opacity-90 transition-opacity"
+              className="inline-flex items-center px-6 py-3 bg-primary text-white font-semibold rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:scale-105"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -149,6 +149,9 @@ export default function TemplatesPage() {
             {favoriteTemplates.length > 0 && (
               <div className="mb-10">
                 <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
+                    <span className="text-lg">⭐</span>
+                  </div>
                   <h2 className="text-xl font-bold text-foreground">Favorites</h2>
                   <span className="text-sm text-muted-foreground">({favoriteTemplates.length})</span>
                 </div>
@@ -170,6 +173,11 @@ export default function TemplatesPage() {
             {regularTemplates.length > 0 && (
               <div>
                 <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </div>
                   <h2 className="text-xl font-bold text-foreground">All Templates</h2>
                   <span className="text-sm text-muted-foreground">({regularTemplates.length})</span>
                 </div>
@@ -205,16 +213,19 @@ function TemplateCard({
   onDelete: (t: Template) => void;
 }) {
   return (
-    <div className="group bg-card border border-border rounded-xl p-5 hover:shadow-lg transition-all">
+    <div className="group bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-5 hover:border-primary/40 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0 pr-2">
-          <h3 className="font-bold text-foreground mb-1 truncate">{template.name}</h3>
+          <div className="flex items-center gap-2 mb-1">
+            {template.is_favorite && <span className="text-lg">⭐</span>}
+            <h3 className="font-bold text-foreground truncate">{template.name}</h3>
+          </div>
           <p className="text-xs text-muted-foreground truncate">{template.category_name}</p>
         </div>
         <div className={`flex-shrink-0 px-3 py-1 rounded-lg text-sm font-bold ${
           template.category_type === 'INCOME'
-            ? 'bg-green-500/10 text-green-600'
-            : 'bg-red-500/10 text-red-600'
+            ? 'bg-success/10 text-success'
+            : 'bg-danger/10 text-danger'
         }`}>
           {template.category_type === 'INCOME' ? '+' : '-'}${parseFloat(template.amount).toFixed(2)}
         </div>
@@ -227,7 +238,7 @@ function TemplateCard({
       <div className="flex items-center space-x-2 mt-4">
         <button
           onClick={() => onUse(template)}
-          className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-semibold flex items-center justify-center space-x-1"
+          className="flex-1 px-4 py-2.5 bg-primary text-white rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:scale-105 text-sm font-semibold flex items-center justify-center space-x-1"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -237,11 +248,11 @@ function TemplateCard({
         
         <button
           onClick={() => onToggleFavorite(template)}
-          className={`p-2.5 rounded-lg transition-all ${
+          className={`p-2.5 rounded-xl transition-all ${
             template.is_favorite
-              ? 'bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30'
-              : 'bg-background text-muted-foreground hover:bg-muted hover:text-yellow-600'
-          }`}
+              ? 'bg-warning/20 text-warning hover:bg-warning/30 shadow-lg'
+              : 'bg-muted/50 text-muted-foreground hover:bg-warning/20 hover:text-warning'
+          } hover:scale-110`}
           title={template.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
         >
           <svg className="w-5 h-5" fill={template.is_favorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={template.is_favorite ? 0 : 2}>
@@ -251,7 +262,7 @@ function TemplateCard({
         
         <button
           onClick={() => onDelete(template)}
-          className="p-2.5 bg-background text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+          className="p-2.5 bg-muted/50 text-muted-foreground hover:text-danger hover:bg-danger/10 rounded-xl transition-all hover:scale-110"
           title="Delete template"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

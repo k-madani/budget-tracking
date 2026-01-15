@@ -27,25 +27,6 @@ interface Category {
   current_spending?: number;
 }
 
-interface Template {
-  id: string;
-  name: string;
-  amount: string;
-  currency: string;
-  note: string;
-  category: string;
-  category_name: string;
-  category_type: string;
-  is_favorite: boolean;
-}
-
-interface StreakData {
-  current: number;
-  longest: number;
-  status: string;
-  message: string;
-}
-
 interface LevelData {
   current: number;
   total_points: number;
@@ -53,15 +34,33 @@ interface LevelData {
   progress_percentage: number;
 }
 
+interface Achievement {
+  id: number;
+  name: string;
+  description: string;
+  icon: string;
+  points: number;
+  is_unlocked: boolean;
+}
+
+interface GamificationStats {
+  total_points: number;
+  level: LevelData;
+  achievements: {
+    unlocked: Achievement[];
+    unlocked_count: number;
+    total_count: number;
+  };
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
-  const [level, setLevel] = useState<LevelData | null>(null);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [gamificationStats, setGamificationStats] = useState<GamificationStats | null>(null);
 
   const [balance, setBalance] = useState(0);
   const [income, setIncome] = useState(0);
@@ -81,12 +80,11 @@ export default function DashboardPage() {
     try {
       setLoading(true);
 
-      const [summaryRes, transactionsRes, categoriesRes, gamificationRes, templatesRes] = await Promise.all([
+      const [summaryRes, transactionsRes, categoriesRes, gamificationRes] = await Promise.all([
         api.get('/transactions/summary'),
         api.get('/transactions'),
         api.get('/categories'),
         api.get('/stats').catch(() => null),
-        api.get('/templates').catch(() => ({ data: [] }))
       ]);
 
       if (summaryRes.data) {
@@ -97,15 +95,13 @@ export default function DashboardPage() {
 
       const allTxns = transactionsRes.data.results || transactionsRes.data || [];
       setAllTransactions(allTxns);
-      setRecentTransactions(allTxns.slice(0, 5));
+      setRecentTransactions(allTxns.slice(0, 4));
 
-      setCategories(categoriesRes.data || []);
-      setTemplates(templatesRes.data || []);
+      setCategories(categoriesRes.data.results || []);
 
       if (gamificationRes?.data) {
-        setLevel(gamificationRes.data.level);
+        setGamificationStats(gamificationRes.data);
       }
-
     } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to load dashboard data');
@@ -119,20 +115,6 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }; 
-
-  const handleQuickAddFromTemplate = async (template: Template) => {
-    try {
-      const response = await api.post(`/templates/${template.id}/use`, {
-        spent_at: new Date().toISOString()
-      });
-
-      toast.success(`Added ${template.name}! 🎉`);
-      fetchDashboardData();
-    } catch (error) {
-      console.error('Failed to use template:', error);
-      toast.error('Failed to add transaction');
-    }
-  };
 
   const getWeeklySpending = () => {
     const now = new Date();
@@ -185,13 +167,23 @@ export default function DashboardPage() {
       .slice(0, 3);
   };
 
+  const getCategoryIcon = (categoryName: string) => {
+    const name = categoryName.toLowerCase();
+    if (name.includes('food') || name.includes('dining') || name.includes('restaurant')) return '☕';
+    if (name.includes('shop') || name.includes('shopping')) return '🛍️';
+    if (name.includes('transport') || name.includes('uber') || name.includes('ride')) return '🚗';
+    if (name.includes('grocery') || name.includes('groceries')) return '🛒';
+    if (name.includes('entertainment')) return '🎬';
+    if (name.includes('health')) return '💊';
+    return '💳';
+  };
+
   const weeklySpending = getWeeklySpending();
   const budgetHealth = getBudgetHealth();
-  const favoriteTemplates = templates;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] dark:bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">Loading dashboard...</p>
@@ -200,125 +192,177 @@ export default function DashboardPage() {
     );
   }
 
-  const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
-
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-background">
+    <div className="min-h-screen bg-background">
       <Navbar currentPage="dashboard" />
 
       <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-12">
+        <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Your financial overview</p>
+            <p className="text-muted-foreground text-sm">Your financial overview</p>
           </div>
           <button
             onClick={() => setIsQuickAddOpen(true)}
-            className="px-6 py-3 bg-primary hover:bg-primary/90 text-white font-semibold rounded-lg transition-colors"
+            className="bg-primary text-white px-6 py-3 rounded-xl font-semibold hover:opacity-90 transition-all shadow-lg hover:shadow-xl hover:scale-105"
           >
             + Add Transaction
           </button>
         </div>
 
-        {/* Quick Actions - Favorite Templates */}
-        {favoriteTemplates.length > 0 && (
-          <div className="bg-gradient-to-br from-primary/5 via-transparent to-accent/5 border border-primary/20 rounded-xl p-6 mb-12">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-bold text-foreground flex items-center space-x-2">
-                  <span>⚡</span>
-                  <span>Quick Actions</span>
-                </h2>
-                <p className="text-sm text-muted-foreground">1-click recurring transactions</p>
+        {/* Hero Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Current Balance */}
+          <div className="group relative overflow-hidden bg-card/80 backdrop-blur-sm rounded-2xl p-6 border-2 border-border hover:border-primary/40 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-muted-foreground text-sm font-medium">Current Balance</p>
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                </div>
               </div>
-              <Link href="/templates" className="text-sm text-primary hover:underline font-medium">
-                Manage Templates →
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {favoriteTemplates.map((template) => (
-                <button
-                  key={template.id}
-                  onClick={() => handleQuickAddFromTemplate(template)}
-                  className="group relative overflow-hidden bg-white dark:bg-card border-2 border-border hover:border-primary/50 rounded-xl p-5 transition-all hover:shadow-lg hover:scale-105"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-2xl">⭐</span>
-                      <div className="text-left">
-                        <h3 className="font-bold text-foreground group-hover:text-primary transition-colors">
-                          {template.name}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">{template.category_name}</p>
-                      </div>
-                    </div>
-                    <div className={`px-2 py-1 rounded text-xs font-medium ${
-                      template.category_type === 'INCOME' 
-                        ? 'bg-green-500/10 text-green-600'
-                        : 'bg-red-500/10 text-red-600'
-                    }`}>
-                      {template.category_type === 'INCOME' ? '+' : '-'}${parseFloat(template.amount).toFixed(2)}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{template.note || 'No note'}</span>
-                    <div className="flex items-center space-x-1 text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      <span className="font-medium">Add Now</span>
-                    </div>
-                  </div>
-
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
-                </button>
-              ))}
+              <p className="text-4xl font-bold text-foreground">${balance.toFixed(2)}</p>
             </div>
           </div>
-        )}
 
-        {/* 1. SUMMARY - Hero Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-white dark:bg-card rounded-xl p-6 border border-gray-200 dark:border-border">
-            <p className="text-sm text-muted-foreground mb-2">Current Balance</p>
-            <p className="text-4xl font-bold text-foreground">${balance.toFixed(2)}</p>
+          {/* Total Income */}
+          <div className="group relative overflow-hidden bg-card/80 backdrop-blur-sm rounded-2xl p-6 border-2 border-border hover:border-success/40 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer">
+            <div className="absolute inset-0 bg-gradient-to-br from-success/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-muted-foreground text-sm font-medium">Total Income</p>
+                <div className="w-10 h-10 bg-success/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <svg className="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-4xl font-bold text-success">${income.toFixed(2)}</p>
+            </div>
           </div>
-          
-          <div className="bg-white dark:bg-card rounded-xl p-6 border border-gray-200 dark:border-border">
-            <p className="text-sm text-muted-foreground mb-2">Total Income</p>
-            <p className="text-4xl font-bold text-green-600 dark:text-green-500">${income.toFixed(2)}</p>
-          </div>
-          
-          <div className="bg-white dark:bg-card rounded-xl p-6 border border-gray-200 dark:border-border">
-            <p className="text-sm text-muted-foreground mb-2">Total Expenses</p>
-            <p className="text-4xl font-bold text-red-600 dark:text-red-500">${expenses.toFixed(2)}</p>
+
+          {/* Total Expenses */}
+          <div className="group relative overflow-hidden bg-card/80 backdrop-blur-sm rounded-2xl p-6 border-2 border-border hover:border-danger/40 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer">
+            <div className="absolute inset-0 bg-gradient-to-br from-danger/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-muted-foreground text-sm font-medium">Total Expenses</p>
+                <div className="w-10 h-10 bg-danger/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <svg className="w-5 h-5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-4xl font-bold text-danger">${expenses.toFixed(2)}</p>
+            </div>
           </div>
         </div>
 
-        {/* 3. ANALYTICS & BUDGET HEALTH */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+        {/* Progress Section */}
+        {gamificationStats && (
+          <div className="mb-8">
+            <Link 
+              href="/gamification"
+              className="group block relative overflow-hidden bg-gradient-to-br from-accent/10 via-primary/5 to-warning/5 border-2 border-primary/20 rounded-2xl p-6 hover:border-primary/40 hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+            >
+              {/* Animated background */}
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              
+              <div className="relative">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-primary/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <span className="text-3xl">🎯</span>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-foreground mb-1">Your Progress & Achievements</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {gamificationStats.total_points} points earned • {gamificationStats.achievements?.unlocked_count || 0}/{gamificationStats.achievements?.total_count || 0} unlocked
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <svg className="w-6 h-6 text-primary group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+
+                {/* Progress Bar */}
+                {gamificationStats.achievements && (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="font-medium text-muted-foreground">Achievement Progress</span>
+                      <span className="font-bold text-primary">
+                        {((gamificationStats.achievements.unlocked_count / gamificationStats.achievements.total_count) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
+                        style={{ width: `${(gamificationStats.achievements.unlocked_count / gamificationStats.achievements.total_count) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Achievements Preview */}
+                {gamificationStats.achievements?.unlocked && gamificationStats.achievements.unlocked.length > 0 ? (
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Recent unlocked:</span>
+                    {gamificationStats.achievements.unlocked.slice(0, 5).map((achievement) => (
+                      <div 
+                        key={achievement.id}
+                        className="flex items-center gap-2 bg-card/50 backdrop-blur-sm border border-border rounded-lg px-3 py-2 whitespace-nowrap group-hover:scale-105 transition-transform"
+                      >
+                        <span className="text-lg">{achievement.icon}</span>
+                        <span className="text-xs font-medium text-foreground">{achievement.name}</span>
+                        <span className="text-xs text-primary font-bold">+{achievement.points}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-muted/30 rounded-xl p-4 border border-border">
+                    <p className="text-sm text-muted-foreground text-center">
+                      🚀 Start tracking transactions to unlock your first achievement!
+                    </p>
+                  </div>
+                )}
+              </div>
+            </Link>
+          </div>
+        )}
+
+        {/* Analytics Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* This Week's Spending */}
-          <div className="bg-white dark:bg-card rounded-xl p-6 border border-gray-200 dark:border-border">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-foreground">This Week's Spending</h2>
-              <Link href="/analytics" className="text-sm text-primary hover:underline">
-                Details →
+          <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-8 border-2 border-border hover:border-primary/40 transition-all duration-300 hover:shadow-xl">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-foreground mb-1">This Week's Spending</h2>
+                <p className="text-sm text-muted-foreground">Your last 7 days</p>
+              </div>
+              <Link href="/analytics" className="text-primary text-sm font-medium hover:underline flex items-center gap-1">
+                Details
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
             </div>
 
             <div className="mb-6">
-              <div className="flex items-baseline space-x-3 mb-2">
+              <div className="flex items-baseline gap-3 mb-2">
                 <span className="text-4xl font-bold text-foreground">
                   ${weeklySpending.thisWeek.toFixed(2)}
                 </span>
                 {weeklySpending.lastWeek > 0 && (
-                  <span className={`text-sm font-semibold px-2 py-1 rounded ${
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${
                     weeklySpending.change > 0 
-                      ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400' 
-                      : 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400'
+                      ? 'bg-danger/10 text-danger' 
+                      : 'bg-success/10 text-success'
                   }`}>
                     {weeklySpending.change > 0 ? '↑' : '↓'} {Math.abs(weeklySpending.change).toFixed(0)}%
                   </span>
@@ -327,30 +371,25 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground">vs ${weeklySpending.lastWeek.toFixed(2)} last week</p>
             </div>
 
-            <div className="h-32 flex items-end space-x-2">
+            <div className="h-36 flex items-end gap-2">
               {weeklySpending.dailyData.map((value, index) => {
                 const maxValue = Math.max(...weeklySpending.dailyData, 1);
                 const height = maxValue > 0 ? (value / maxValue) * 100 : 0;
-                const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
                 
                 return (
-                  <div key={index} className="flex-1 flex flex-col items-center">
-                    <div className="w-full relative group">
+                  <div key={index} className="flex-1 flex flex-col items-center gap-2 group">
+                    <div className="w-full">
                       {value > 0 ? (
-                        <>
-                          <div 
-                            className="w-full bg-primary rounded-t hover:bg-primary/80 transition-colors cursor-pointer"
-                            style={{ height: `${Math.max(height * 1.2, 8)}px` }}
-                          />
-                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs px-2 py-1 rounded whitespace-nowrap transition-opacity">
-                            ${value.toFixed(0)}
-                          </div>
-                        </>
+                        <div 
+                          className="w-full bg-primary/70 group-hover:bg-primary rounded-t-lg transition-all cursor-pointer"
+                          style={{ height: `${Math.max(height, 8)}px` }}
+                        />
                       ) : (
-                        <div className="w-full h-1 bg-gray-200 dark:bg-muted rounded" />
+                        <div className="w-full h-2 bg-muted rounded" />
                       )}
                     </div>
-                    <span className="text-xs text-muted-foreground mt-2">{days[index]}</span>
+                    <span className="text-xs text-muted-foreground">{days[index]}</span>
                   </div>
                 );
               })}
@@ -358,18 +397,24 @@ export default function DashboardPage() {
           </div>
 
           {/* Budget Health */}
-          <div className="bg-white dark:bg-card rounded-xl p-6 border border-gray-200 dark:border-border">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-foreground">Budget Health</h2>
-              <Link href="/categories" className="text-sm text-primary hover:underline">
-                Manage →
+          <div className="bg-card/80 backdrop-blur-sm rounded-2xl p-8 border-2 border-border hover:border-primary/40 transition-all duration-300 hover:shadow-xl">
+            <div className="flex items-start justify-between mb-8">
+              <div>
+                <h2 className="text-xl font-bold text-foreground mb-1">Budget Health</h2>
+                <p className="text-sm text-muted-foreground">Top 3 categories</p>
+              </div>
+              <Link href="/categories" className="text-primary text-sm font-medium hover:underline flex items-center gap-1">
+                Manage
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
             </div>
 
             {budgetHealth.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground text-sm mb-3">No budget limits set</p>
-                <Link href="/categories" className="text-primary text-sm hover:underline">
+                <Link href="/categories" className="text-primary text-sm hover:underline font-medium">
                   Set budget limits →
                 </Link>
               </div>
@@ -379,24 +424,24 @@ export default function DashboardPage() {
                   <div key={index}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-semibold text-foreground">{item.name}</span>
-                      <span className={`font-bold ${
+                      <span className={`text-sm font-bold ${
                         item.status === 'over' 
-                          ? 'text-red-600 dark:text-red-400'
+                          ? 'text-danger'
                           : item.status === 'warning'
-                          ? 'text-yellow-600 dark:text-yellow-400'
-                          : 'text-green-600 dark:text-green-400'
+                          ? 'text-warning'
+                          : 'text-success'
                       }`}>
                         {item.percentage.toFixed(0)}%
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 dark:bg-muted rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                       <div
-                        className={`h-full transition-all duration-500 ${
+                        className={`h-full transition-all duration-500 rounded-full ${
                           item.status === 'over' 
-                            ? 'bg-red-600 dark:bg-red-500'
+                            ? 'bg-danger'
                             : item.status === 'warning'
-                            ? 'bg-yellow-500 dark:bg-yellow-400'
-                            : 'bg-green-600 dark:bg-green-500'
+                            ? 'bg-warning'
+                            : 'bg-success'
                         }`}
                         style={{ width: `${Math.min(item.percentage, 100)}%` }}
                       />
@@ -411,13 +456,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* 4. RECENT TRANSACTIONS */}
-        <div className="bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border">
-          <div className="p-6 border-b border-gray-200 dark:border-border">
+        {/* Recent Transactions */}
+        <div className="bg-card/80 backdrop-blur-sm rounded-2xl overflow-hidden border-2 border-border hover:border-primary/40 transition-all duration-300 hover:shadow-xl">
+          <div className="p-6 border-b border-border">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-foreground">Recent Transactions</h2>
-              <Link href="/transactions" className="text-sm text-primary hover:underline">
-                View all →
+              <div>
+                <h2 className="text-xl font-bold text-foreground mb-1">Recent Transactions</h2>
+                <p className="text-sm text-muted-foreground">Latest {recentTransactions.length} transactions</p>
+              </div>
+              <Link href="/transactions" className="text-primary text-sm font-medium hover:underline flex items-center gap-1">
+                View all
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
             </div>
           </div>
@@ -427,49 +478,52 @@ export default function DashboardPage() {
               <p className="text-muted-foreground mb-3">No transactions yet</p>
               <button
                 onClick={() => setIsQuickAddOpen(true)}
-                className="text-primary text-sm hover:underline"
+                className="text-primary text-sm hover:underline font-medium"
               >
-                Add your first transaction
+                Add your first transaction →
               </button>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200 dark:divide-border">
-              {recentTransactions.map((transaction) => (
-                <div 
-                  key={transaction.id} 
-                  className="p-4 hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      transaction.category_type === 'INCOME' 
-                        ? 'bg-green-100 dark:bg-green-500/20' 
-                        : 'bg-red-100 dark:bg-red-500/20'
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full ${
-                        transaction.category_type === 'INCOME' ? 'bg-green-600' : 'bg-red-600'
-                      }`} />
+            <div>
+              {recentTransactions.map((transaction, index) => {
+                const icon = getCategoryIcon(transaction.category_name || '');
+                const iconBg = transaction.category_name?.toLowerCase().includes('food') || transaction.category_name?.toLowerCase().includes('dining')
+                  ? 'bg-warning/10'
+                  : transaction.category_name?.toLowerCase().includes('shop')
+                  ? 'bg-accent/10'
+                  : transaction.category_name?.toLowerCase().includes('transport')
+                  ? 'bg-primary/10'
+                  : 'bg-muted';
+
+                return (
+                  <div 
+                    key={transaction.id} 
+                    className={`px-6 py-4 hover:bg-muted/30 transition-colors flex items-center justify-between group cursor-pointer ${
+                      index !== recentTransactions.length - 1 ? 'border-b border-border' : ''
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform`}>
+                        {icon}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground">
+                          {transaction.note || transaction.category_name || 'Transaction'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {transaction.category_name} • {new Date(transaction.spent_at).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">
-                        {transaction.category_name || 'Uncategorized'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(transaction.spent_at).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric'
-                        })}
-                      </p>
-                    </div>
+                    <span className="text-lg font-bold text-danger">
+                      ${parseFloat(transaction.amount).toFixed(2)}
+                    </span>
                   </div>
-                  <span className={`font-bold text-lg ${
-                    transaction.category_type === 'INCOME' 
-                      ? 'text-green-600 dark:text-green-500' 
-                      : 'text-red-600 dark:text-red-500'
-                  }`}>
-                    {transaction.category_type === 'INCOME' ? '+' : '-'}${parseFloat(transaction.amount).toFixed(2)}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
