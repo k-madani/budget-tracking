@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch } from 'react-redux';
 import Link from 'next/link';
@@ -10,6 +10,7 @@ import { toast } from 'react-hot-toast';
 import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/exportUtils';
 import Navbar from '@/components/Navbar';
 import { LineChart, Line, PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
+import { toPng } from 'html-to-image';
 
 interface Transaction {
     id: string;
@@ -57,6 +58,12 @@ export default function AnalyticsPage() {
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [expandedInsight, setExpandedInsight] = useState<number | null>(null);
 
+    // Chart refs for downloading as PNG
+    const spendingTrendRef = useRef<HTMLDivElement>(null);
+    const expenseDistRef = useRef<HTMLDivElement>(null);
+    const budgetVsActualRef = useRef<HTMLDivElement>(null);
+    const incomeExpenseRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
         const token = localStorage.getItem('access_token');
         if (!token) {
@@ -91,13 +98,39 @@ export default function AnalyticsPage() {
 
             setCategories(categoriesRes.data.results || []);
         } catch (error: any) {
-            console.error('Failed to fetch data:', error);
             toast.error('Failed to load analytics data');
             if (error.response?.status === 401) {
                 router.push('/login');
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const downloadChart = async (
+        ref: React.RefObject<HTMLDivElement | null>,
+        filename: string
+    ) => {
+        if (!ref.current) {
+            toast.error('Chart not ready');
+            return;
+        }
+
+        try {
+            const dataUrl = await toPng(ref.current, {
+                backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff',
+                pixelRatio: 2,
+                cacheBust: true,
+            });
+
+            const link = document.createElement('a');
+            link.download = `${filename}-${new Date().toISOString().split('T')[0]}.png`;
+            link.href = dataUrl;
+            link.click();
+
+            toast.success('Chart downloaded');
+        } catch (err) {
+            toast.error('Failed to download chart');
         }
     };
 
@@ -137,7 +170,6 @@ export default function AnalyticsPage() {
 
             toast.success('Analytics exported successfully');
         } catch (error) {
-            console.error('Export error:', error);
             toast.error('Failed to export data');
         }
     };
@@ -447,6 +479,19 @@ export default function AnalyticsPage() {
     const totalSubscriptionCost = subscriptions.reduce((sum, sub) => sum + sub.amount, 0);
     const insights = generateDynamicInsights();
 
+    // Reusable download icon button
+    const DownloadButton = ({ chartRef, filename }: { chartRef: React.RefObject<HTMLDivElement | null>; filename: string }) => (
+        <button
+            onClick={() => downloadChart(chartRef, filename)}
+            className="flex-shrink-0 p-2 rounded-lg bg-muted/50 hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all"
+            title="Download chart as PNG"
+        >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+        </button>
+    );
+
     return (
         <div className="min-h-screen bg-background">
             <Navbar currentPage="analytics" />
@@ -508,7 +553,6 @@ export default function AnalyticsPage() {
                     <>
                         {/* Conversational Intelligence Hub */}
                         <div className="mb-8">
-                            {/* Monthly Story Card */}
                             <div className="group bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-2 border-primary/20 rounded-2xl p-6 mb-6 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer">
                                 <div className="flex items-start gap-3">
                                     <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
@@ -520,10 +564,10 @@ export default function AnalyticsPage() {
                                         </h2>
                                         <p className="text-foreground/90 leading-relaxed mb-4">
                                             {insights.netSavings >= 0 
-                                                ? `Great work! You've saved ${insights.netSavings.toFixed(2)} this period. That's a ${insights.savingsRate.toFixed(0)}% savings rate. `
-                                                : `You spent ${Math.abs(insights.netSavings).toFixed(2)} more than you earned this period. `
+                                                ? `Great work! You've saved $${insights.netSavings.toFixed(2)} this period. That's a ${insights.savingsRate.toFixed(0)}% savings rate. `
+                                                : `You spent $${Math.abs(insights.netSavings).toFixed(2)} more than you earned this period. `
                                             }
-                                            {insights.topCategory && `Your biggest expense was ${insights.topCategory.name} at ${insights.topCategory.value.toFixed(2)}. `}
+                                            {insights.topCategory && `Your biggest expense was ${insights.topCategory.name} at $${insights.topCategory.value.toFixed(2)}. `}
                                             {insights.trendDirection === 'increasing' && `Your spending is trending up ${Math.abs(insights.trendPercentage).toFixed(0)}% compared to last week. `}
                                             {insights.trendDirection === 'decreasing' && `Great news! Your spending dropped ${Math.abs(insights.trendPercentage).toFixed(0)}% compared to last week. `}
                                             {insights.overBudgetCategories.length > 0 
@@ -552,9 +596,7 @@ export default function AnalyticsPage() {
                                 </div>
                             </div>
 
-                            {/* Dynamic Insight Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {/* Insight 1: Savings Rate */}
                                 <div 
                                     onClick={() => setExpandedInsight(expandedInsight === 1 ? null : 1)}
                                     className="group bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-5 hover:border-primary/40 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer"
@@ -610,7 +652,6 @@ export default function AnalyticsPage() {
                                     )}
                                 </div>
 
-                                {/* Insight 2: Budget Warning */}
                                 <div 
                                     onClick={() => setExpandedInsight(expandedInsight === 2 ? null : 2)}
                                     className="group bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-5 hover:border-warning/40 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer"
@@ -630,9 +671,9 @@ export default function AnalyticsPage() {
                                             </h3>
                                             <p className="text-sm text-muted-foreground">
                                                 {insights.overBudgetCategories.length > 0
-                                                    ? `${insights.overBudgetCategories[0].category} over by ${(insights.overBudgetCategories[0].Actual - insights.overBudgetCategories[0].Budget).toFixed(2)}`
+                                                    ? `${insights.overBudgetCategories[0].category} over by $${(insights.overBudgetCategories[0].Actual - insights.overBudgetCategories[0].Budget).toFixed(2)}`
                                                     : totalSubscriptionCost > 0
-                                                    ? `${subscriptions.length} subscriptions = ${totalSubscriptionCost.toFixed(2)}/month`
+                                                    ? `${subscriptions.length} subscriptions = $${totalSubscriptionCost.toFixed(2)}/month`
                                                     : `Most spending on ${insights.highestSpendingDay}s`
                                                 }
                                             </p>
@@ -687,7 +728,6 @@ export default function AnalyticsPage() {
                                     )}
                                 </div>
 
-                                {/* Insight 3: Trend */}
                                 <div 
                                     onClick={() => setExpandedInsight(expandedInsight === 3 ? null : 3)}
                                     className="group bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-5 hover:border-success/40 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer"
@@ -807,13 +847,16 @@ export default function AnalyticsPage() {
                         )}
 
                         {/* Spending Trend Chart */}
-                        <div className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 mb-8 hover:border-primary/40 hover:shadow-xl transition-all">
-                            <div className="mb-4">
-                                <h2 className="text-xl font-bold text-foreground mb-2">Spending Trend</h2>
-                                <p className="text-sm text-muted-foreground">
-                                    💬 Your spending has been {insights.netSavings >= 0 ? 'under control' : 'higher than income'} this period. 
-                                    {insights.netSavings >= 0 ? ' Keep up the great work!' : ' Consider reviewing your largest expenses.'}
-                                </p>
+                        <div ref={spendingTrendRef} className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 mb-8 hover:border-primary/40 hover:shadow-xl transition-all">
+                            <div className="mb-4 flex items-start justify-between gap-4">
+                                <div>
+                                    <h2 className="text-xl font-bold text-foreground mb-2">Spending Trend</h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        💬 Your spending has been {insights.netSavings >= 0 ? 'under control' : 'higher than income'} this period. 
+                                        {insights.netSavings >= 0 ? ' Keep up the great work!' : ' Consider reviewing your largest expenses.'}
+                                    </p>
+                                </div>
+                                <DownloadButton chartRef={spendingTrendRef} filename="spending-trend" />
                             </div>
                             <ResponsiveContainer width="100%" height={350}>
                                 <LineChart data={spendingTrend} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
@@ -831,15 +874,18 @@ export default function AnalyticsPage() {
                         {/* Charts Grid */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                             {/* Expense Distribution */}
-                            <div className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 hover:border-primary/40 hover:shadow-xl transition-all">
-                                <div className="mb-4">
-                                    <h2 className="text-xl font-bold text-foreground mb-2">Expense Distribution</h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        💬 {insights.topCategory 
-                                            ? `${insights.topCategory.name} is your biggest expense (${((insights.topCategory.value / insights.totalExpenses) * 100).toFixed(0)}%). ${insights.topCategory.value > insights.totalExpenses * 0.3 ? 'Consider if this aligns with your priorities.' : 'This seems balanced.'}`
-                                            : 'Start tracking expenses to see your breakdown.'
-                                        }
-                                    </p>
+                            <div ref={expenseDistRef} className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 hover:border-primary/40 hover:shadow-xl transition-all">
+                                <div className="mb-4 flex items-start justify-between gap-4">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-foreground mb-2">Expense Distribution</h2>
+                                        <p className="text-sm text-muted-foreground">
+                                            💬 {insights.topCategory 
+                                                ? `${insights.topCategory.name} is your biggest expense (${((insights.topCategory.value / insights.totalExpenses) * 100).toFixed(0)}%). ${insights.topCategory.value > insights.totalExpenses * 0.3 ? 'Consider if this aligns with your priorities.' : 'This seems balanced.'}`
+                                                : 'Start tracking expenses to see your breakdown.'
+                                            }
+                                        </p>
+                                    </div>
+                                    <DownloadButton chartRef={expenseDistRef} filename="expense-distribution" />
                                 </div>
                                 {categoryBreakdown.length > 0 ? (
                                     <>
@@ -909,17 +955,20 @@ export default function AnalyticsPage() {
                             </div>
 
                             {/* Budget vs Actual */}
-                            <div className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 hover:border-primary/40 hover:shadow-xl transition-all">
-                                <div className="mb-4">
-                                    <h2 className="text-xl font-bold text-foreground mb-2">Budget vs Actual</h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        💬 {insights.overBudgetCategories.length > 0
-                                            ? `You're over budget in ${insights.overBudgetCategories.length} ${insights.overBudgetCategories.length === 1 ? 'category' : 'categories'}. Time to adjust spending or budgets.`
-                                            : budgetVsActual.length > 0
-                                            ? 'All budgets are looking healthy! Great financial discipline. 🎉'
-                                            : 'Set budget limits to track your spending goals.'
-                                        }
-                                    </p>
+                            <div ref={budgetVsActualRef} className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 hover:border-primary/40 hover:shadow-xl transition-all">
+                                <div className="mb-4 flex items-start justify-between gap-4">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-foreground mb-2">Budget vs Actual</h2>
+                                        <p className="text-sm text-muted-foreground">
+                                            💬 {insights.overBudgetCategories.length > 0
+                                                ? `You're over budget in ${insights.overBudgetCategories.length} ${insights.overBudgetCategories.length === 1 ? 'category' : 'categories'}. Time to adjust spending or budgets.`
+                                                : budgetVsActual.length > 0
+                                                ? 'All budgets are looking healthy! Great financial discipline. 🎉'
+                                                : 'Set budget limits to track your spending goals.'
+                                            }
+                                        </p>
+                                    </div>
+                                    <DownloadButton chartRef={budgetVsActualRef} filename="budget-vs-actual" />
                                 </div>
                                 {budgetVsActual.length > 0 ? (
                                     <>
@@ -973,20 +1022,23 @@ export default function AnalyticsPage() {
                         </div>
 
                         {/* Income vs Expenses */}
-                        <div className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 mb-8 hover:border-primary/40 hover:shadow-xl transition-all">
-                            <div className="mb-4">
-                                <h2 className="text-xl font-bold text-foreground mb-2">Income vs Expenses</h2>
-                                <p className="text-sm text-muted-foreground">
-                                    💬 You're saving {insights.savingsRate.toFixed(0)}% of your income this period. 
-                                    {insights.savingsRate >= 20 
-                                        ? ' Excellent work - you\'re on track for financial freedom! 🎯'
-                                        : insights.savingsRate >= 10
-                                        ? ' Good progress! Aim for 20%+ for faster wealth building.'
-                                        : insights.savingsRate > 0
-                                        ? ' Every bit counts! Try to gradually increase this percentage.'
-                                        : ' Consider ways to reduce expenses or increase income.'
-                                    }
-                                </p>
+                        <div ref={incomeExpenseRef} className="bg-card/80 backdrop-blur-sm border-2 border-border rounded-2xl p-6 mb-8 hover:border-primary/40 hover:shadow-xl transition-all">
+                            <div className="mb-4 flex items-start justify-between gap-4">
+                                <div>
+                                    <h2 className="text-xl font-bold text-foreground mb-2">Income vs Expenses</h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        💬 You're saving {insights.savingsRate.toFixed(0)}% of your income this period. 
+                                        {insights.savingsRate >= 20 
+                                            ? ' Excellent work - you\'re on track for financial freedom! 🎯'
+                                            : insights.savingsRate >= 10
+                                            ? ' Good progress! Aim for 20%+ for faster wealth building.'
+                                            : insights.savingsRate > 0
+                                            ? ' Every bit counts! Try to gradually increase this percentage.'
+                                            : ' Consider ways to reduce expenses or increase income.'
+                                        }
+                                    </p>
+                                </div>
+                                <DownloadButton chartRef={incomeExpenseRef} filename="income-vs-expenses" />
                             </div>
                             <ResponsiveContainer width="100%" height={300}>
                                 <BarChart data={incomeExpenseData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>

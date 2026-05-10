@@ -30,13 +30,12 @@ export default function LoginPage() {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!email || !password) {
-      toast.error('Please fill in all fields');
-      return;
-    }
+  const handleSubmit = async () => {
+  
+  if (!email || !password) {
+    toast.error('Please fill in all fields');
+    return;
+  }
 
     setLoading(true);
 
@@ -54,14 +53,20 @@ export default function LoginPage() {
         router.push('/dashboard');
       }, 500);
     } catch (error: any) {
-      console.error('Login error:', error);
-      const errorMsg = error.response?.data?.error || 
-                       error.response?.data?.detail ||
-                       error.response?.data?.message || 
+      const errorMsg = error?.response?.data?.detail || 
+                       error?.response?.data?.error ||
+                       error?.response?.data?.message ||
+                       error?.message ||
                        'Invalid email or password';
       toast.error(errorMsg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !loading) {
+      handleSubmit();
     }
   };
 
@@ -122,6 +127,7 @@ export default function LoginPage() {
             </div>
             
             <button
+              type="button"
               onClick={toggleTheme}
               className="p-2 rounded-lg border-2 border-border hover:bg-muted hover:scale-110 transition-all"
               aria-label="Toggle theme"
@@ -138,7 +144,7 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
                 Email Address
@@ -148,6 +154,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={handleKeyDown}
                 className="w-full px-4 py-3 bg-card/80 backdrop-blur-sm border-2 border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all text-foreground placeholder-muted-foreground"
                 placeholder="you@example.com"
                 disabled={loading}
@@ -169,14 +176,10 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   className="w-full px-4 py-3 bg-card/80 backdrop-blur-sm border-2 border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all text-foreground placeholder-muted-foreground pr-12"
                   placeholder="••••••••"
                   disabled={loading}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleSubmit(e);
-                    }
-                  }}
                 />
                 <button
                   type="button"
@@ -198,7 +201,8 @@ export default function LoginPage() {
             </div>
 
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               disabled={loading}
               className="w-full py-3 px-4 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl hover:scale-105"
             >
@@ -211,7 +215,7 @@ export default function LoginPage() {
                 <span>Sign In</span>
               )}
             </button>
-          </form>
+          </div>
 
           <div className="text-center">
             <p className="text-sm text-muted-foreground">

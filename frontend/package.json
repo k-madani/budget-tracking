@@ -12,6 +12,7 @@
     "@reduxjs/toolkit": "^2.11.2",
     "axios": "^1.13.2",
     "date-fns": "^4.1.0",
+    "html-to-image": "^1.11.13",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
     "next": "16.0.10",
