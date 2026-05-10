@@ -44,16 +44,16 @@ export default function LandingPage() {
   }, []);
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    setMousePosition({ 
-      x: (e.clientX / window.innerWidth) * 100, 
-      y: (e.clientY / window.innerHeight) * 100 
+    setMousePosition({
+      x: (e.clientX / window.innerWidth) * 100,
+      y: (e.clientY / window.innerHeight) * 100
     });
   };
 
   const toggleTheme = () => {
     const newTheme = !isDark;
     setIsDark(newTheme);
-    
+
     if (newTheme) {
       document.documentElement.classList.add('dark');
       localStorage.setItem('theme', 'dark');
@@ -70,7 +70,7 @@ export default function LandingPage() {
     return (
       <div className="min-h-screen bg-background relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/10" />
-        
+
         <nav className="relative z-50 border-b border-border bg-background/80 backdrop-blur-sm">
           <div className="max-w-6xl mx-auto px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
@@ -98,7 +98,7 @@ export default function LandingPage() {
                     </svg>
                   )}
                 </button>
-                
+
                 <Link
                   href="/dashboard"
                   className="bg-primary text-white px-5 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
@@ -186,11 +186,11 @@ export default function LandingPage() {
 
   // REGULAR LANDING PAGE
   return (
-    <div 
+    <div
       className="min-h-screen bg-background transition-colors duration-300 relative overflow-hidden"
       onMouseMove={handleMouseMove}
     >
-      <div 
+      <div
         className="fixed inset-0 opacity-20 pointer-events-none transition-all duration-300"
         style={{
           background: `radial-gradient(circle 800px at ${mousePosition.x}% ${mousePosition.y}%, hsl(var(--primary)), transparent 60%)`
@@ -210,6 +210,12 @@ export default function LandingPage() {
             </Link>
 
             <div className="flex items-center space-x-4">
+              <Link href="/login" className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors">
+                Log in
+              </Link>
+              <Link href="/register" className="bg-primary text-white px-5 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+                Sign up
+              </Link>
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
@@ -224,13 +230,6 @@ export default function LandingPage() {
                   </svg>
                 )}
               </button>
-
-              <Link href="/login" className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors">
-                Log in
-              </Link>
-              <Link href="/register" className="bg-primary text-white px-5 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-                Sign up
-              </Link>
             </div>
           </div>
         </div>
@@ -345,7 +344,7 @@ export default function LandingPage() {
                         </div>
                         <div className="text-sm font-semibold text-foreground">${item.amount}</div>
                       </div>
-                      <div 
+                      <div
                         className={`absolute bottom-0 left-0 h-1 ${item.color} transition-all duration-300 group-hover:h-full group-hover:opacity-10`}
                         style={{ width: `${item.percent}%` }}
                       />
@@ -386,7 +385,7 @@ export default function LandingPage() {
                 <p className="text-lg text-muted-foreground max-w-md">
                   Add expenses in seconds. No forms, no complexity.
                 </p>
-                
+
                 {hoveredFeature === 0 && (
                   <div className="mt-6 p-4 bg-background/50 rounded-xl border border-border animate-slide-up">
                     <p className="text-sm text-muted-foreground italic">

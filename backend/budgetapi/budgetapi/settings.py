@@ -96,7 +96,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME', 'budget_tracker'),
         'USER': os.environ.get('DB_USER', 'budget_user'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'Project@0000'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'Budget@123'),
         'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '5432'),
         'CONN_MAX_AGE': 600,  # Connection pooling

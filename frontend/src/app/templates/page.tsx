@@ -39,7 +39,7 @@ export default function TemplatesPage() {
     try {
       setLoading(true);
       const response = await api.get('/templates');
-      setTemplates(response.data || []);
+      setTemplates(response.data.results || response.data || []);
     } catch (error: any) {
       console.error('Failed to fetch templates:', error);
       toast.error('Failed to load templates');
@@ -53,9 +53,7 @@ export default function TemplatesPage() {
 
   const handleToggleFavorite = async (template: Template) => {
     try {
-      await api.put(`/templates/${template.id}`, {
-        is_favorite: !template.is_favorite
-      });
+      await api.patch(`/templates/${template.id}`, { is_favorite: !template.is_favorite });
 
       toast.success(template.is_favorite ? 'Removed from favorites ⭐' : 'Added to favorites ⭐');
       fetchTemplates();

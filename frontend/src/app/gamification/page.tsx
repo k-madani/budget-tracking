@@ -69,7 +69,7 @@ export default function ProgressPage() {
       // Calculate progress for each locked achievement
       const progress: Record<number, AchievementProgress> = {};
       const transactions = transactionsRes.data.results || [];
-      const categories = categoriesRes.data || [];
+      const categories = categoriesRes.data.results || categoriesRes.data || [];
       
       achievementsRes.data.achievements.forEach((ach: Achievement) => {
         if (!ach.is_unlocked && ach.requirement_value) {

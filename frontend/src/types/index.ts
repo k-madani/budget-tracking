@@ -17,7 +17,7 @@ export interface AuthState {
 export interface Category {
   categoryId: string;
   categoryName: string;
-  categoryType: 'income' | 'expense';
+  categoryType: 'INCOME' | 'EXPENSE';
   userId: string;
 }
 
